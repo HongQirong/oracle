@@ -1,0 +1,19 @@
+SELECT req.request_id,
+       fcp.user_concurrent_program_name,
+       usr.user_name,
+       req.request_date,
+       trunc(SYSDATE) - trunc(request_date) days,
+       req.logfile_name,
+       req.outfile_name,
+       frt.RESPONSIBILITY_name,
+       frt.RESPONSIBILITY_ID
+  FROM applsys.fnd_concurrent_requests req,
+       apps.fnd_concurrent_programs_vl fcp,
+       applsys.fnd_user                usr,
+       FND_RESPONSIBILITY_TL frt
+WHERE req.concurrent_program_id = fcp.concurrent_program_id
+   AND req.requested_by = usr.user_id
+   AND fcp.user_concurrent_program_name LIKE '%'
+   and req.RESPONSIBILITY_APPLICATION_ID= frt.APPLICATION_ID
+   and req.RESPONSIBILITY_ID =  frt.RESPONSIBILITY_ID
+   and frt.LANGUAGE = 'ZHT'
