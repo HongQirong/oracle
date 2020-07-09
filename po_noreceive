@@ -1,0 +1,150 @@
+SELECT DISTINCT
+       h.segment1
+           po_num,
+       h.po_header_id
+           po_header_id,
+       NULL
+           release_num,
+       h.TYPE_LOOKUP_CODE,
+       h.VENDOR_SITE_ID,
+       posite.VENDOR_SITE_CODE,
+       h.authorization_status,
+       dis.po_line_id,
+       line_num,
+       line_location.LINE_LOCATION_ID,
+       items.segment1
+           item_name,
+       items.inventory_item_id
+           item_id,
+       ship_to_organization_id,
+       l.unit_meas_lookup_code
+           po_line_uom,
+       l.quantity
+           po_line_quantity,
+       l.unit_price,
+       line_location.quantity_received
+           po_recive_qty,
+       NVL ((line_location.quantity - line_location.quantity_received), 0)
+           po_norecive_qty,
+       items.primary_uom_code
+           item_uom,
+       l.closed_code,
+       CASE WHEN req_distribution_id IS NOT NULL THEN 'Y' ELSE 'N' END
+           req_exist,
+       currency_code,
+       h.approved_date,
+       v.segment1,
+       v.vendor_name,
+       item_description,
+       --line_location.inspection_required_flag,
+       /*
+       1:Standard Receipt              --要檢驗
+       0:None,2:Inspection Required    --要檢驗
+       3:Direct Delivery               --免驗
+       */
+       CASE WHEN line_location.RECEIVING_ROUTING_ID = 3 THEN 'N' ELSE 'Y' END
+           inspection_required_flag,
+       need_by_date,
+       promised_date,
+       FULL_NAME
+           buyer
+  FROM po_line_locations_all  line_location,
+       po_lines_all           l,
+       po_headers_all         h,
+       po_distributions_all   dis,
+       mtl_system_items       items,
+       po_vendors             v,
+       PO_VENDOR_SITES_ALL    posite,
+       PER_PEOPLE_V7          emp
+ WHERE     h.po_header_id = l.po_header_id(+)
+       AND line_location.po_line_id = l.po_line_id
+       AND dis.po_line_id = l.po_line_id
+       AND line_location.quantity - line_location.quantity_received > 0
+       AND NVL (l.closed_code, 'OPEN') NOT IN ('FINALLY CLOSED', 'CLOSED')
+       AND NVL (line_location.closed_code, 'OPEN') IN
+               ('OPEN', 'CLOSED FOR INVOICE')
+       AND NVL (line_location.cancel_flag, 'N') = 'N'
+       AND NVL (l.cancel_flag, 'N') = 'N'
+       AND v.vendor_id = h.vendor_id
+       AND h.VENDOR_SITE_ID = posite.VENDOR_SITE_ID
+       AND h.agent_id = emp.person_id(+)
+       AND l.item_id = items.inventory_item_id
+       AND TYPE_LOOKUP_CODE <> 'BLANKET'
+       AND ship_to_organization_id = items.organization_id
+UNION ALL
+SELECT DISTINCT
+       h.segment1
+           po_num,
+       h.po_header_id
+           po_header_id,
+       pra.release_num,
+       h.TYPE_LOOKUP_CODE,
+       h.VENDOR_SITE_ID,
+       posite.VENDOR_SITE_CODE,
+       h.authorization_status,
+       dis.po_line_id,
+       line_num,
+       line_location.LINE_LOCATION_ID,
+       items.segment1
+           item_name,
+       items.inventory_item_id
+           item_id,
+       ship_to_organization_id,
+       l.unit_meas_lookup_code
+           po_line_uom,
+       l.quantity
+           po_line_quantity,
+       l.unit_price,
+       line_location.quantity_received
+           po_recive_qty,
+       NVL ((line_location.quantity - line_location.quantity_received), 0)
+           po_norecive_qty,
+       items.primary_uom_code
+           item_uom,
+       l.closed_code,
+       CASE WHEN req_distribution_id IS NOT NULL THEN 'Y' ELSE 'N' END
+           req_exist,
+       currency_code,
+       h.approved_date,
+       v.segment1,
+       v.vendor_name,
+       item_description,
+       --line_location.inspection_required_flag,
+       /*
+       1:Standard Receipt              --要檢驗
+       0:None,2:Inspection Required    --要檢驗
+       3:Direct Delivery               --免驗
+       */
+       CASE WHEN line_location.RECEIVING_ROUTING_ID = 3 THEN 'N' ELSE 'Y' END
+           inspection_required_flag,
+       need_by_date,
+       promised_date,
+       FULL_NAME
+           buyer
+  FROM po_line_locations_all  line_location,
+       po_lines_all           l,
+       po_headers_all         h,
+       po_distributions_all   dis,
+       mtl_system_items       items,
+       po_vendors             v,
+       PO_VENDOR_SITES_ALL    posite,
+       PER_PEOPLE_V7          emp,
+       (SELECT release_num, po_release_id, approved_flag
+          FROM po_releases_all
+         WHERE NVL (approved_flag, 'N') IN ('Y', 'R')) pra
+ WHERE     h.po_header_id = l.po_header_id(+)
+       AND line_location.po_line_id = l.po_line_id
+       AND dis.po_line_id = l.po_line_id
+       AND line_location.quantity - line_location.quantity_received > 0
+       AND NVL (l.closed_code, 'OPEN') NOT IN ('FINALLY CLOSED', 'CLOSED')
+       AND NVL (line_location.closed_code, 'OPEN') IN
+               ('OPEN', 'CLOSED FOR INVOICE')
+       AND NVL (line_location.cancel_flag, 'N') = 'N'
+       AND NVL (l.cancel_flag, 'N') = 'N'
+       AND v.vendor_id = h.vendor_id
+       AND h.VENDOR_SITE_ID = posite.VENDOR_SITE_ID
+       AND h.agent_id = emp.person_id(+)
+       AND l.item_id = items.inventory_item_id
+       AND pra.po_release_id = line_location.po_release_id
+       AND TYPE_LOOKUP_CODE = 'BLANKET'
+       AND ship_to_organization_id = items.organization_id;
