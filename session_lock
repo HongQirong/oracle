@@ -1,0 +1,23 @@
+SELECT B.SID,
+       B.SERIAL#,
+       D.SPID,
+       B.STATUS,
+       C.OBJECT_NAME,
+       B.program,
+       B.terminal,
+       B.LOGON_TIME,
+       B.OSUSER,
+       MACHINE,
+       B.TYPE,
+       B.CLIENT_IDENTIFIER,
+       B.ACTION,
+       B.MODULE,
+       b.USERNAME
+  FROM V$LOCKED_OBJECT  A,
+       V$SESSION        B,
+       DBA_OBJECTS      C,
+       V$PROCESS        D
+ WHERE     A.SESSION_ID = B.SID
+       AND A.OBJECT_ID = C.OBJECT_ID
+       AND B.PADDR = D.ADDR
+       AND B.STATUS = 'INACTIVE';
