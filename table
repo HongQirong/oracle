@@ -1,0 +1,18 @@
+  SELECT C.OWNER,
+         C.TABLE_NAME,
+         C.COLUMN_ID,
+         C.COLUMN_NAME,
+         DATA_TYPE,
+         DATA_LENGTH,
+         DATA_PRECISION,
+         DATA_DEFAULT,
+         NULLABLE,
+         COMMENTS
+    FROM ALL_TAB_COLUMNS C
+         JOIN ALL_TABLES T ON C.OWNER = T.OWNER AND C.TABLE_NAME = T.TABLE_NAME
+         LEFT JOIN ALL_COL_COMMENTS R
+             ON     C.OWNER = R.Owner
+                AND C.TABLE_NAME = R.TABLE_NAME
+                AND C.COLUMN_NAME = R.COLUMN_NAME
+   WHERE C.TABLE_NAME like '%'
+ORDER BY C.TABLE_NAME, C.COLUMN_ID
