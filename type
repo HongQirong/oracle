@@ -1,0 +1,56 @@
+CREATE OR REPLACE TYPE test_t FORCE AS OBJECT (v_name VARCHAR2 (1)) NOT FINAL
+/
+
+CREATE OR REPLACE TYPE test_m
+    FORCE
+    UNDER test_t
+(
+    test_ti test_t,
+    OVERRIDING MEMBER PROCEDURE initialize,
+    MEMBER PROCEDURE SET_name (P_name IN NUMBER),
+    MEMBER PROCEDURE GET_name (X_name OUT NUMBER),
+    MEMBER FUNCTION GET_name
+        RETURN NUMBER
+)
+    NOT FINAL
+/
+
+
+CREATE OR REPLACE TYPE BODY a_m
+AS
+    OVERRIDING MEMBER PROCEDURE initialize
+    IS
+    BEGIN
+        SELF.test_ti := test_t (v_name => self.test_t.v_name);
+    /*
+    self.b_t := b_t (v_name => SELF.b_t.v_name);
+    */
+    END initialize;
+
+    MEMBER PROCEDURE SET_name (P_ROUTING_ID IN NUMBER)
+    IS
+        V_err_msg   VARCHAR2 (4000);
+    BEGIN
+        self.test_ti.v_name := '1';
+    EXCEPTION
+        WHEN OTHERS
+        THEN
+            DBMS_OUTPUT.PUT_LINE (
+                   DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
+                || DBMS_UTILITY.FORMAT_ERROR_STACK);
+    END SET_name;
+
+    MEMBER PROCEDURE GET_name (X_name OUT VARCHAR2)
+    IS
+    BEGIN
+        X_name := SELF.test_ti.V_name;
+    END GET_name;
+
+    MEMBER FUNCTION GET_name
+        RETURN NUMBER
+    IS
+    BEGIN
+        RETURN SELF.test_ti.V_name;
+    END GET_name;
+END;
+/
