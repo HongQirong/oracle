@@ -1,0 +1,1 @@
+SELECT USERENV ('language') FROM DUAL;
