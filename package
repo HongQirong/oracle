@@ -1,0 +1,3 @@
+SELECT DISTINCT (us.name)
+  FROM user_source us
+ WHERE UPPER (us.TEXT) LIKE UPPER ('%') AND us.name LIKE '%';
