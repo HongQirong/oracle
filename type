@@ -54,3 +54,13 @@ AS
     END GET_name;
 END;
 /
+DECLARE
+    a   a_t;
+    b   b_m;
+BEGIN
+    b := b_m (a);
+    b.initialize;
+    b.a_info.v_outcome.set_result ('Y');
+    DBMS_OUTPUT.PUT_LINE (b.a_info.v_outcome.get_result);
+END;
+/
