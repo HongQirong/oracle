@@ -1,0 +1,19 @@
+DECLARE
+    arr_a   arr := arr ();
+    arr_b   arr := arr ();
+    arr_c   arr;
+BEGIN
+    arr_b.EXTEND;
+    arr_b.EXTEND;
+    arr_b (1) := 1;
+    arr_b (2) := 1;
+
+    FOR R IN arr_b.FIRST .. arr_b.LAST
+    LOOP
+        arr_a.EXTEND;
+        arr_a (arr_a.LAST) := arr_b (R);
+    END LOOP;
+
+    arr_c := arr_b;
+    DBMS_OUTPUT.PUT_LINE ('arr_c(1) = ' || arr_c (1));
+END;
