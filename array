@@ -28,6 +28,9 @@ DECLARE
 
     TYPE t_c IS TABLE OF t_b
         INDEX BY VARCHAR2 (40);
+        
+    TYPE arr_chr_t IS TABLE OF VARCHAR2 (40)
+        INDEX BY BINARY_INTEGER;
 
     a   t_a;
     b   t_b;
