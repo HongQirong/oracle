@@ -1,0 +1,7 @@
+           SELECT CONNECT_BY_ROOT e e,
+                  SYS_CONNECT_BY_PATH (f, '/') f,
+                  SYS_CONNECT_BY_PATH (f, ',') f,
+                  LEVEL             lv
+             FROM DUAL
+       CONNECT BY PRIOR a = b AND PRIOR c = d
+ORDER SIBLINGS BY h.num, h.ms
