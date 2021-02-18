@@ -1,0 +1,44 @@
+CREATE OR REPLACE TRIGGER TRG
+    BEFORE DELETE OR UPDATE OR INSERT
+    ON DUAL
+    REFERENCING NEW AS NEW OLD AS OLD
+    FOR EACH ROW
+    WHEN (NVL (OLD.a, -1) != NVL (NEW.a, -1))
+DECLARE
+    V_PROGRAM    VARCHAR2 (80) := NULL;
+    V_MODULE     VARCHAR2 (80) := NULL;
+    V_MACHINE    VARCHAR2 (80) := NULL;
+    V_TERMINAL   VARCHAR2 (80) := NULL;
+    v_action     VARCHAR2 (10);
+BEGIN
+    SELECT SUBSTRB (PROGRAM, 1, 50),
+           SUBSTRB (MODULE, 1, 50),
+           SUBSTRB (MACHINE, 1, 50),
+           SUBSTRB (TERMINAL, 1, 50)
+      INTO V_PROGRAM,
+           V_MODULE,
+           V_MACHINE,
+           V_TERMINAL
+      FROM V$SESSION
+     WHERE AUDSID = USERENV ('SESSIONID');
+
+    IF INSERTING
+    THEN
+        v_action := 'INSERT';
+    ELSIF UPDATING
+    THEN
+        v_action := 'UPDATE';
+    ELSIF DELETING
+    THEN
+        v_action := 'DELETE';
+    END IF;
+EXCEPTION
+    WHEN OTHERS
+    THEN
+        RAISE_APPLICATION_ERROR (
+            -20000,
+               DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
+            || DBMS_UTILITY.FORMAT_ERROR_STACK);
+        ROLLBACK;
+END;
+/
