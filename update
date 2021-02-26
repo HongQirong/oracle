@@ -1,0 +1,10 @@
+DECLARE
+    v1   NUMBER;
+BEGIN
+    MERGE INTO table1 e
+         USING table2 m
+            ON (e.c1 = m.c1 AND e.c1 = v1)
+    WHEN MATCHED
+    THEN
+        UPDATE SET e.c2 = m.c2, e.c3 = m.c3;
+END;
