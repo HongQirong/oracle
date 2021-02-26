@@ -1,1 +1,32 @@
 select * from all_jobs WHERE UPPER(WHAT) LIKE '%';
+DECLARE
+    v_job         NUMBER;
+    v_user_name   VARCHAR2 (128);
+    v_db_user     VARCHAR (40) := 'AA';
+BEGIN
+    SELECT USER INTO v_user_name FROM DUAL;
+
+    EXECUTE IMMEDIATE 'alter session set current_schema = ' || v_db_user;
+
+
+    SYS.DBMS_JOB.SUBMIT (job         => v_job,
+                         what        => 'begin
+                   null;
+                   end;
+                       ',
+                         next_date   => SYSDATE + 1 / 24,
+                         interval    => 'null',
+                         no_parse    => FALSE);
+    SYS.DBMS_OUTPUT.PUT_LINE ('Job Number is: ' || TO_CHAR (v_job));
+
+    EXECUTE IMMEDIATE 'alter session set current_schema = ' || v_user_name;
+
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS
+    THEN
+        ROLLBACK;
+
+        EXECUTE IMMEDIATE
+            'alter session set current_schema = ' || v_user_name;
+END;
