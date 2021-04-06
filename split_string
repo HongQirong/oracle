@@ -1,0 +1,10 @@
+    SELECT REGEXP_SUBSTR (st,
+                          '[^, ]+',
+                          1,
+                          LEVEL)
+      FROM (SELECT '1234,5678' st FROM DUAL)
+CONNECT BY REGEXP_SUBSTR (st,
+                          '[^, ]+',
+                          1,
+                          LEVEL)
+               IS NOT NULL;
