@@ -30,3 +30,10 @@ EXCEPTION
         EXECUTE IMMEDIATE
             'alter session set current_schema = ' || v_user_name;
 END;
+
+BEGIN
+    DBMS_JOB.next_date (jod_id,
+                        TO_DATE ('20211110 13:30:00', 'yyyymmdd hh24:mi:ss'));
+
+    COMMIT;
+END;
