@@ -1,0 +1,26 @@
+BEGIN
+    MESSAGE :=
+           '<TABLE  border = 2>'
+        || '<TR style ="background-color :Aqua">'
+        || '<TD>'
+        || '你好'
+        || '</TD>'
+        || '<TD>'
+        || '你好'
+        || '</TD>'
+        || '</TR>';
+    MESSAGE :=
+           MESSAGE
+        || '<TR>'
+        || '<TD>'
+        || '你好'
+        || '</TD>'
+        || '<TD align=right>'
+        || '你好'
+        || '</TD>'
+        || '<TD align=right>'
+        || '你好'
+        || '</TD>'
+        || '</TR>';
+    MESSAGE := MESSAGE || '</TABLE>';
+END;
