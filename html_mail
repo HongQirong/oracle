@@ -1,25 +1,27 @@
+DECLARE
+    MESSAGE   VARCHAR2 (1000);
 BEGIN
     MESSAGE :=
            '<TABLE  border = 2>'
-        || '<TR style ="background-color :Aqua">'
+        || '<TR style ="background-color :Red">'
         || '<TD>'
-        || '你好'
+        || '你好1'
         || '</TD>'
         || '<TD>'
-        || '你好'
+        || '你好2'
         || '</TD>'
         || '</TR>';
     MESSAGE :=
            MESSAGE
         || '<TR>'
         || '<TD>'
-        || '你好'
+        || '你好3'
         || '</TD>'
         || '<TD align=right>'
-        || '你好'
+        || '你好4'
         || '</TD>'
         || '<TD align=right>'
-        || '你好'
+        || '你好5'
         || '</TD>'
         || '</TR>';
     MESSAGE := MESSAGE || '</TABLE>';
