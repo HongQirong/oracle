@@ -1,23 +1,29 @@
-SELECT B.SID,
-       B.SERIAL#,
-       D.SPID,
-       B.STATUS,
-       C.OBJECT_NAME,
-       B.program,
-       B.terminal,
-       B.LOGON_TIME,
-       B.OSUSER,
-       MACHINE,
-       B.TYPE,
-       B.CLIENT_IDENTIFIER,
-       B.ACTION,
-       B.MODULE,
-       b.USERNAME
-  FROM V$LOCKED_OBJECT  A,
-       V$SESSION        B,
-       DBA_OBJECTS      C,
-       V$PROCESS        D
- WHERE     A.SESSION_ID = B.SID
-       AND A.OBJECT_ID = C.OBJECT_ID
-       AND B.PADDR = D.ADDR
-       AND B.STATUS = 'INACTIVE';
+SELECT b.sid
+      ,b.serial#
+      ,d.spid
+      ,b.status
+      ,c.object_name
+      ,b.program
+      ,b.terminal
+      ,b.logon_time
+      ,b.osuser
+      ,machine
+      ,b.TYPE
+      ,b.client_identifier
+      ,b.action
+      ,b.module
+      ,b.username
+  FROM v$locked_object a
+      ,v$session b
+      ,dba_objects c
+      ,v$process d
+ WHERE a.session_id = b.sid
+       AND a.object_id = c.object_id
+       AND b.paddr = d.addr
+       AND b.status = 'INACTIVE';
+
+SELECT *
+  FROM v$session
+ WHERE audsid = USERENV('SESSIONID');
+
+-- ALTER SYSTEM KILL SESSION '1496,313' IMMEDIATE;--sid,serial#
