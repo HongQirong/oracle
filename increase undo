@@ -1,0 +1,6 @@
+ALTER SYSTEM SET undo_retention=1800 SCOPE=BOTH;
+SHOW PARAMETERS undo_retention;
+
+SELECT VALUE AS ur
+  FROM v$parameter
+ WHERE name = 'undo_retention';
