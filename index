@@ -1,0 +1,1 @@
+EXEC dbms_stats.gather_index_stats(ownname => 'ONT',indname => 'OE_ORDER_LINES_N1',estimate_percent => '10',degree => '4');
