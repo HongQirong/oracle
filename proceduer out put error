@@ -1,0 +1,75 @@
+DECLARE
+   e_call_error EXCEPTION;
+   e_error EXCEPTION;
+   x_error_msg VARCHAR2(4000);
+   x_result VARCHAR2(1);
+BEGIN
+   BEGIN
+      x_result := 'Y';
+
+      IF 'x' != 'y'
+      THEN
+         x_error_msg := x_error_msg
+                        || 'XXXXX';
+         RAISE e_error;
+      END IF;
+   EXCEPTION
+      WHEN e_call_error
+      THEN
+         RAISE e_call_error;
+      WHEN e_error
+      THEN
+         x_result := 'N';
+         x_error_msg := x_error_msg
+                        || CHR(10)
+                        || '錯誤: '
+                        || DBMS_UTILITY.format_error_stack
+                        || DBMS_UTILITY.format_error_backtrace
+                        || DBMS_UTILITY.format_call_stack;
+      WHEN OTHERS
+      THEN
+         x_result := 'N';
+         x_error_msg := x_error_msg
+                        || CHR(10)
+                        || '錯誤: '
+                        || DBMS_UTILITY.format_error_stack
+                        || DBMS_UTILITY.format_error_backtrace
+                        || DBMS_UTILITY.format_call_stack;
+   END;
+
+   DBMS_OUTPUT.put_line('x_result = '
+                        || x_result);
+
+   IF NVL(x_result, 'N') != 'Y'
+   THEN
+      RAISE e_call_error;
+   END IF;
+EXCEPTION
+   WHEN e_call_error
+   THEN
+      ROLLBACK;
+      DBMS_OUTPUT.put_line('x_result = '
+                           || x_result);
+      DBMS_OUTPUT.put_line('x_error_msg = '
+                           || x_error_msg);
+   WHEN e_error
+   THEN
+      ROLLBACK;
+      x_result := 'N';
+      x_error_msg := x_error_msg
+                     || CHR(10)
+                     || '錯誤: '
+                     || DBMS_UTILITY.format_error_stack
+                     || DBMS_UTILITY.format_error_backtrace
+                     || DBMS_UTILITY.format_call_stack;
+   WHEN OTHERS
+   THEN
+      ROLLBACK;
+      x_result := 'N';
+      x_error_msg := x_error_msg
+                     || CHR(10)
+                     || '錯誤: '
+                     || DBMS_UTILITY.format_error_stack
+                     || DBMS_UTILITY.format_error_backtrace
+                     || DBMS_UTILITY.format_call_stack;
+END;
