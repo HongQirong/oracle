@@ -26,3 +26,609 @@ BEGIN
         || '</TR>';
     MESSAGE := MESSAGE || '</TABLE>';
 END;
+
+DECLARE
+   p_sub VARCHAR2(20000);
+   --郵件標題
+   p_txt VARCHAR2(20000); --郵件正文
+   p_receiver VARCHAR2(20000); --接收地址
+   p_cc VARCHAR2(20000); --接收地址
+   p_oracle_directory VARCHAR2(20000); --附檔路徑
+   p_filename VARCHAR2(20000); --附件
+
+   authid current_user;
+
+   use_mathod VARCHAR2(20000) := '用system/manager 將下列權限給APPS 不然會沒辦法用
+  GRANT CREATE ANY DIRECTORY TO APPS;
+  GRANT GLOBAL QUERY REWRITE TO APPS;
+  GRANT DROP ANY DIRECTORY TO APPS WITH ADMIN OPTION;
+  --建立虛擬路徑
+  CREATE OR REPLACE DIRECTORY DIR_FOR_SEND_MAIL1 AS ''/tmp''
+  --給虛擬路徑給大家用
+  GRANT READ,WRITE ON DIRECTORY DIR_FOR_SEND_MAIL1 TO PUBLIC;
+  --查詢有無建立
+  select * from dba_directories;
+  --刪除建立的虛擬路徑
+  drop directory DIR_FOR_SEND_MAIL1
+
+  作用：用oracle發送郵件
+  主要功能：1、支持多收件人
+            2、支持中文
+            3、支持抄送人
+            4、支持大於32K的附件
+            5、支持多行正文
+            6、支持多附件
+            7、支持文本附件和二進制附件
+            8、支持HTML格式
+  參數說明：
+            p_txt :郵件正文
+            p_sub: 郵件標題
+            p_SendorAddress : 發送人郵件地址
+            p_ReceiverAddress : 接收地址，可以同時發送到多個地址上，地址之間用","或者";"隔開
+            p_EmailServer : 郵件服務器地址，可以是域名或者IP
+            p_Port ：郵件服務器端口
+            p_need_smtp：是否需要smtp認證，0表示不需要，1表示需要
+            p_user：smtp驗證需要的用戶名
+            p_pass：smtp驗證需要的密碼
+            p_filename：附件名稱，必須包含完整的路徑，如"d:tempa.txt"。
+                        可以有多個附件，附件名稱只能用逗號或者分號分隔
+            p_encode：附件編碼轉換格式，其中 p_encode=''8bit'' 表示文本類型附件
+                                             p_encode=''base64'' 表示二進制類型附件
+  注意：
+        1、對於文本類型的附件，不能用base64的方式發送，否則出錯
+        2、對於多個附件只能用同一種格式發送';
+   --固定參數
+   p_sendor VARCHAR2(50) := 'XX@mail.com.tw';
+   p_server VARCHAR2(30) := ''; --IP
+   p_port NUMBER := 0; --port
+   p_need_smtp INT := 1;
+   p_user VARCHAR2(30) := 'RORY'; --account
+   p_pass VARCHAR2(30) := '*****'; --password
+   p_encode VARCHAR2(30) := '8bit'; --'base64';
+   --以上為固定參數 ,說明請看上列參數說明
+
+   l_crlf VARCHAR2(2) := UTL_TCP.crlf;
+   l_sendoraddress VARCHAR2(4000);
+   l_splite VARCHAR2(10) := '++';
+   boundary CONSTANT VARCHAR2(256) := '-----BYSUK';
+   first_boundary CONSTANT VARCHAR2(256)
+      := '--'
+         || boundary
+         || l_crlf ;
+   last_boundary CONSTANT VARCHAR2(256)
+      := '--'
+         || boundary
+         || '--'
+         || l_crlf ;
+   multipart_mime_type CONSTANT VARCHAR2(256)
+      := 'multipart/mixed; boundary="'
+         || boundary
+         || '"' ;
+   /* 以下部分是發送大二進制附件時用到的變量 */
+   l_fil BFILE;
+   l_file_len NUMBER;
+   l_modulo NUMBER;
+   l_pieces NUMBER;
+   l_file_handle UTL_FILE.file_type;
+   l_amt BINARY_INTEGER
+      :=   672
+         * 3; /* ensures proper format;   2016 */
+   l_filepos PLS_INTEGER := 1; /* pointer for the file */
+   l_chunks NUMBER;
+   l_buf RAW(2100);
+   l_data RAW(2100);
+   l_max_line_width NUMBER := 54;
+   --L_DIRECTORY_BASE_NAME VARCHAR2(100) := 'DIR_FOR_SEND_MAIL'; --自定路徑
+   l_line VARCHAR2(1000);
+   l_mesg VARCHAR2(32767);
+
+   /* 以上部分是發送大二進制附件時用到的變量 */
+
+   TYPE address_list IS TABLE OF VARCHAR2(100)
+      INDEX BY BINARY_INTEGER;
+
+   my_address_list address_list;
+
+   TYPE acct_list IS TABLE OF VARCHAR2(100)
+      INDEX BY BINARY_INTEGER;
+
+   my_acct_list acct_list;
+
+   -------------------------------------返回附件源文件所在目錄或者名稱--------------------------------------
+   FUNCTION get_file(p_file  VARCHAR2
+                    ,p_get   INT)
+      RETURN VARCHAR2
+   IS
+      --p_get=1 表示返回目錄
+      --p_get=2 表示返回文件名
+      l_file VARCHAR2(1000);
+   BEGIN
+      IF INSTR(p_file
+              ,'\') > 0
+      THEN
+         --windows
+         IF p_get = 1
+         THEN
+            l_file := SUBSTR(p_file
+                            ,1
+                            ,  INSTR(p_file
+                                    ,'\'
+                                    ,-1)
+                             - 1);
+         ELSIF p_get = 2
+         THEN
+            l_file := SUBSTR(p_file
+                            ,-(  LENGTH(p_file)
+                               - INSTR(p_file
+                                      ,''
+                                      ,-1)));
+         END IF;
+      ELSIF INSTR(p_file
+                 ,'/') > 0
+      THEN
+         --linux/unix
+         IF p_get = 1
+         THEN
+            l_file := SUBSTR(p_file
+                            ,1
+                            ,  INSTR(p_file
+                                    ,'/'
+                                    ,-1)
+                             - 1);
+         ELSIF p_get = 2
+         THEN
+            l_file := SUBSTR(p_file
+                            ,-(  LENGTH(p_file)
+                               - INSTR(p_file
+                                      ,'/'
+                                      ,-1)));
+         END IF;
+      END IF;
+
+      RETURN l_file;
+   END;
+
+   ---------------------------------------------刪除directory------------------------------------
+   PROCEDURE drop_directory(p_directory_name  VARCHAR2)
+   IS
+   BEGIN
+      EXECUTE IMMEDIATE
+         'drop directory '
+         || p_directory_name;
+   EXCEPTION
+      WHEN OTHERS
+      THEN
+         NULL;
+   END;
+
+   --------------------------------------------------創建directory-----------------------------------------
+   PROCEDURE create_directory(p_directory_name  VARCHAR2
+                             ,p_dir             VARCHAR2)
+   IS
+   BEGIN
+      EXECUTE IMMEDIATE
+         'create or replace directory '
+         || p_directory_name
+         || ' as '''
+         || p_dir
+         || '''';
+
+      EXECUTE IMMEDIATE
+         'grant read,write on directory '
+         || p_directory_name
+         || ' to public';
+   EXCEPTION
+      WHEN OTHERS
+      THEN
+         RAISE;
+   END;
+
+   --------------------------------------------分割郵件地址或者附件地址-----------------------------------
+   PROCEDURE p_splite_str(p_str          VARCHAR2
+                         ,p_splite_flag  INT DEFAULT 1)
+   IS
+      l_addr VARCHAR2(254) := '';
+      l_len INT;
+      l_str VARCHAR2(4000);
+      j INT := 0; --表示郵件地址或者附件的個數
+   BEGIN
+      /*處理接收郵件地址列表，包括去空格、將;轉換為,等*/
+      l_str := TRIM(RTRIM(REPLACE(REPLACE(p_str
+                                         ,';'
+                                         ,',')
+                                 ,' '
+                                 ,'')
+                         ,','));
+      l_len := LENGTH(l_str);
+
+      FOR i IN 1 .. l_len
+      LOOP
+         IF SUBSTR(l_str
+                  ,i
+                  ,1) <> ','
+         THEN
+            l_addr := l_addr
+                      || SUBSTR(l_str
+                               ,i
+                               ,1);
+         ELSE
+            j :=   j
+                 + 1;
+
+            IF p_splite_flag = 1
+            THEN
+               --表示處理郵件地址
+               --前後需要加上'<>'，否則很多郵箱將不能發送郵件
+               l_addr := '<'
+                         || l_addr
+                         || '>';
+               --調用郵件發送過程
+               my_address_list(j) := l_addr;
+            ELSIF p_splite_flag = 2
+            THEN
+               --表示處理附件名稱
+               my_acct_list(j) := l_addr;
+            END IF;
+
+            l_addr := '';
+         END IF;
+
+         IF i = l_len
+         THEN
+            j :=   j
+                 + 1;
+
+            IF p_splite_flag = 1
+            THEN
+               --調用郵件發送過程
+               l_addr := '<'
+                         || l_addr
+                         || '>';
+               my_address_list(j) := l_addr;
+            ELSIF p_splite_flag = 2
+            THEN
+               my_acct_list(j) := l_addr;
+            END IF;
+         END IF;
+      END LOOP;
+   END;
+
+   ------------------------------------------------寫郵件頭和郵件內容------------------------------------------
+   PROCEDURE write_data(p_conn   IN OUT NOCOPY UTL_SMTP.connection
+                       ,p_name                 VARCHAR2
+                       ,p_value                VARCHAR2
+                       ,p_splite               VARCHAR2 DEFAULT ':'
+                       ,p_crlf                 VARCHAR2 DEFAULT l_crlf)
+   IS
+   BEGIN
+      /* utl_raw.cast_to_raw 對解決中文亂碼問題很重要*/
+      UTL_SMTP.write_raw_data(p_conn
+                             ,UTL_RAW.cast_to_raw(CONVERT(p_name
+                                                          || p_splite
+                                                          || p_value
+                                                          || p_crlf
+                                                         ,'ZHT16BIG5')));
+   --'UTF8' UTF8 'ZHT16BIG5' 繁體字 --'ZHS16GBK' 簡體
+   END;
+
+   ----------------------------------------寫MIME郵件尾部-----------------------------------------------------
+
+   PROCEDURE end_boundary(conn IN OUT NOCOPY UTL_SMTP.connection
+                         ,LAST IN            BOOLEAN DEFAULT FALSE)
+   IS
+   BEGIN
+      UTL_SMTP.write_data(conn
+                         ,UTL_TCP.crlf);
+
+      IF (LAST)
+      THEN
+         UTL_SMTP.write_data(conn
+                            ,last_boundary);
+      END IF;
+   END;
+
+   ----------------------------------------------發送附件----------------------------------------------------
+   PROCEDURE attachment(conn         IN OUT NOCOPY UTL_SMTP.connection
+                       ,mime_type                  VARCHAR2 DEFAULT 'text/html'
+                       ,inline                     BOOLEAN DEFAULT TRUE
+                       ,filename                   VARCHAR2 DEFAULT 't.txt'
+                       ,transfer_enc               VARCHAR2 DEFAULT '8bit'
+                       ,dt_name                    VARCHAR2 DEFAULT '0')
+   IS
+      l_filename VARCHAR2(1000);
+   BEGIN
+      --寫附件頭
+      UTL_SMTP.write_data(conn
+                         ,first_boundary);
+      --設置附件格式
+      l_filename := filename;
+
+      IF (inline)
+      THEN
+         write_data(conn
+                   ,'Content-Disposition'
+                   ,'inline; filename="'
+                    || l_filename
+                    || '"');
+      ELSE
+         write_data(conn
+                   ,'Content-Disposition'
+                   ,'attachment; filename="'
+                    || l_filename
+                    || '"');
+      END IF;
+
+      --設置附件的轉換格式
+      IF (transfer_enc IS NOT NULL)
+      THEN
+         write_data(conn
+                   ,'Content-Transfer-Encoding'
+                   ,transfer_enc);
+      END IF;
+
+      UTL_SMTP.write_data(conn
+                         ,UTL_TCP.crlf);
+
+      --begin 貼附件內容
+      IF transfer_enc = '8bit'
+      THEN
+         --如果是文本類型的附件
+         BEGIN
+            l_file_handle := UTL_FILE.fopen(dt_name
+                                           ,l_filename
+                                           ,'r'); --打開文件
+
+            --把附件分成多份，這樣可以發送超過32K的附件
+            LOOP
+               UTL_FILE.get_line(l_file_handle
+                                ,l_line);
+               l_mesg := l_line
+                         || l_crlf;
+               write_data(conn
+                         ,''
+                         ,l_mesg
+                         ,''
+                         ,'');
+            END LOOP;
+
+            UTL_FILE.fclose(l_file_handle);
+            end_boundary(conn);
+         EXCEPTION
+            WHEN OTHERS
+            THEN
+               UTL_FILE.fclose(l_file_handle);
+               end_boundary(conn);
+         END; --結束文本類型附件的處理
+      ELSIF transfer_enc = 'base64'
+      THEN
+         --如果是二進制類型的附件
+         BEGIN
+            --把附件分成多份，這樣可以發送超過32K的附件
+            l_filepos := 1; --重置offset，在發送多個附件時，必須重置
+            l_fil := BFILENAME(dt_name
+                              ,l_filename);
+            l_file_len := DBMS_LOB.getlength(l_fil); --取得檔案長度
+            l_modulo := MOD(l_file_len
+                           ,l_amt); --檔案長度/L_AMT 的餘數
+            l_pieces := TRUNC(  l_file_len
+                              / l_amt); --檔案長度/L_AMT 的商數
+
+            --如有餘數則多加 1
+            IF (l_modulo <> 0)
+            THEN
+               l_pieces :=   l_pieces
+                           + 1;
+            END IF;
+
+            DBMS_LOB.fileopen(l_fil
+                             ,DBMS_LOB.file_readonly); --開檔
+            DBMS_LOB.read(l_fil
+                         ,l_amt
+                         ,l_filepos
+                         ,l_buf); --讀出檔案
+            l_data := NULL;
+
+            FOR i IN 1 .. l_pieces
+            LOOP
+               l_filepos :=     i
+                              * l_amt
+                            + 1;
+               l_file_len :=   l_file_len
+                             - l_amt;
+               l_data := UTL_RAW.CONCAT(l_data
+                                       ,l_buf);
+               l_chunks := TRUNC(  UTL_RAW.LENGTH(l_data)
+                                 / l_max_line_width);
+
+               IF (i <> l_pieces)
+               THEN
+                  l_chunks :=   l_chunks
+                              - 1;
+               END IF;
+
+               UTL_SMTP.write_raw_data(conn
+                                      ,UTL_ENCODE.base64_encode(l_data));
+               l_data := NULL;
+
+               IF (l_file_len < l_amt
+                   AND l_file_len > 0)
+               THEN
+                  l_amt := l_file_len;
+               END IF;
+
+               --資料已經結束
+               IF l_file_len <> 0
+               THEN
+                  DBMS_LOB.read(l_fil
+                               ,l_amt
+                               ,l_filepos
+                               ,l_buf);
+               END IF;
+            END LOOP;
+
+            DBMS_LOB.fileclose(l_fil);
+            end_boundary(conn);
+         EXCEPTION
+            WHEN OTHERS
+            THEN
+               IF DBMS_LOB.ISOPEN(l_fil) = 1
+               THEN
+                  DBMS_LOB.fileclose(l_fil);
+               END IF;
+
+               end_boundary(conn);
+               RAISE;
+         END; --結束處理二進制附件
+      END IF; --結束處理附件內容
+   END;
+
+   ---------------------------------------------真正發送郵件的過程--------------------------------------------
+   PROCEDURE p_email(p_sendoraddress2    VARCHAR2
+                    , --發送地址
+                     p_receiveraddress2  VARCHAR2) --接受地址
+   IS
+      l_conn UTL_SMTP.connection; --定義連接
+      l_db_name VARCHAR2(200) := fnd_profile.VALUE('APPS_DATABASE_ID');
+      v_datetime VARCHAR2(20)
+         := TO_CHAR(SYSDATE
+                   ,'YYYY/MM/DD HH24:MI:SS');
+   BEGIN
+      /*初始化郵件服務器信息，連接郵件服務器*/
+      l_conn := UTL_SMTP.open_connection(p_server
+                                        ,p_port);
+      --UTL_SMTP.HELO(L_CONN ,P_SERVER); --有些要用此指令才會送
+      UTL_SMTP.ehlo(l_conn
+                   ,p_server); --大部份用此指令送
+
+      /* smtp服務器登錄校驗 */
+      IF p_need_smtp = 1
+      THEN
+         UTL_SMTP.command(l_conn
+                         ,'AUTH LOGIN'
+                         ,'');
+         UTL_SMTP.command(l_conn
+                         ,UTL_RAW.cast_to_varchar2(UTL_ENCODE.base64_encode(UTL_RAW.cast_to_raw(p_user))));
+         UTL_SMTP.command(l_conn
+                         ,UTL_RAW.cast_to_varchar2(UTL_ENCODE.base64_encode(UTL_RAW.cast_to_raw(p_pass))));
+      END IF;
+
+      /*設置發送地址和接收地址*/
+      UTL_SMTP.mail(l_conn
+                   ,p_sendoraddress2);
+      UTL_SMTP.rcpt(l_conn
+                   ,p_receiveraddress2);
+
+      /*設置郵件頭*/
+      UTL_SMTP.open_data(l_conn);
+      /*設置發送時間*/
+      write_data(l_conn
+                ,'Date'
+                ,v_datetime);
+      /*設置發送人*/
+      write_data(l_conn
+                ,'From'
+                ,p_sendor);
+      /*設置接收人*/
+      write_data(l_conn
+                ,'To'
+                ,p_receiver);
+      /*設置CC接收人*/
+      write_data(l_conn
+                ,'cc'
+                ,p_cc);
+      /*設置郵件主題*/
+      write_data(l_conn
+                ,'Subject'
+                ,p_sub
+                 || '('
+                 || l_db_name
+                 || ')');
+      write_data(l_conn
+                ,'Content-Type'
+                ,multipart_mime_type);
+      UTL_SMTP.write_data(l_conn
+                         ,UTL_TCP.crlf);
+      UTL_SMTP.write_data(l_conn
+                         ,first_boundary);
+      --WRITE_DATA(L_CONN ,'Content-Type' ,'text/plain;charset=gb2312'); --GB2312 為簡體
+      write_data(l_conn
+                ,'Content-Type'
+                ,'text/html;charset=BIG5'); --指定寄出的內容為BIG5
+      --單獨空一行，否則，正文內容不顯示
+      UTL_SMTP.write_data(l_conn
+                         ,UTL_TCP.crlf);
+      /* 設置郵件正文
+       把分隔符還原成chr(10)。這主要是為了shell中調用該過程，如果有多行，則先把多行的內容合併成一行，並用 l_splite分隔
+       然後用 l_crlf替換chr(10)。這一步是必須的，否則將不能發送郵件正文有多行的郵件*/
+      write_data(l_conn
+                ,''
+                ,REPLACE(REPLACE(p_txt
+                                ,l_splite
+                                ,CHR(10))
+                        ,CHR(10)
+                        ,l_crlf)
+                ,''
+                ,'');
+      end_boundary(l_conn);
+
+      --如果文件名稱不為空，則發送附件
+      IF (p_filename IS NOT NULL)
+      THEN
+         --根據逗號或者分號拆分附件地址
+         p_splite_str(p_filename
+                     ,2);
+
+         --循環發送附件(在同一個郵件中)
+         FOR k IN 1 .. my_acct_list.COUNT
+         LOOP
+            attachment(conn => l_conn
+                      ,filename => my_acct_list(k)
+                      ,transfer_enc => p_encode
+                      ,dt_name => p_oracle_directory);
+         END LOOP;
+      END IF;
+
+      /*關閉數據寫入*/
+      UTL_SMTP.close_data(l_conn);
+      /*關閉連接*/
+      UTL_SMTP.quit(l_conn);
+   EXCEPTION
+      WHEN OTHERS
+      THEN
+         RAISE;
+   END;
+---------------------------------------------------主過程-----------------------------------------------------
+BEGIN
+   l_sendoraddress := '<'
+                      || p_sendor
+                      || '>';
+   p_splite_str(p_receiver); --處理郵件地址
+
+   FOR k IN 1 .. my_address_list.COUNT
+   LOOP
+      p_email(l_sendoraddress
+             ,my_address_list(k));
+   END LOOP;
+
+   IF p_cc IS NOT NULL
+   THEN
+      p_splite_str(p_cc);
+
+      FOR k IN 1 .. my_address_list.COUNT
+      LOOP
+         p_email(l_sendoraddress
+                ,my_address_list(k));
+      END LOOP;
+   END IF; --處理郵件地址
+/*處理郵件地址，根據逗號分割郵件*/
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      fnd_file.put_line(fnd_file.LOG
+                       ,'Error:'
+                        || SQLERRM);
+      --DBMS_OUTPUT.put_line(DBMS_UTILITY.format_error_stack);
+      --DBMS_OUTPUT.put_line(DBMS_UTILITY.format_call_stack);
+      RAISE;
+END;
