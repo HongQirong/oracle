@@ -27,6 +27,1498 @@ BEGIN
     MESSAGE := MESSAGE || '</TABLE>';
 END;
 
+CREATE OR REPLACE PACKAGE apps.xx
+IS
+   TYPE alert_rec IS RECORD
+   (
+      batch_id NUMBER
+     ,sort_order NUMBER
+     ,rec1 VARCHAR2(2000)
+     ,rec2 VARCHAR2(2000)
+     ,rec3 VARCHAR2(2000)
+     ,rec4 VARCHAR2(2000)
+     ,rec5 VARCHAR2(2000)
+     ,rec6 VARCHAR2(2000)
+     ,rec7 VARCHAR2(2000)
+     ,rec8 VARCHAR2(2000)
+     ,rec9 VARCHAR2(2000)
+     ,rec10 VARCHAR2(2000)
+     ,rec11 VARCHAR2(2000)
+     ,rec12 VARCHAR2(2000)
+     ,rec13 VARCHAR2(2000)
+     ,rec14 VARCHAR2(2000)
+     ,rec15 VARCHAR2(2000)
+     ,rec16 VARCHAR2(2000)
+     ,rec17 VARCHAR2(2000)
+     ,rec18 VARCHAR2(2000)
+     ,rec19 VARCHAR2(2000)
+     ,rec20 VARCHAR2(2000)
+     ,rec21 VARCHAR2(2000)
+     ,rec22 VARCHAR2(2000)
+     ,rec23 VARCHAR2(2000)
+     ,rec24 VARCHAR2(2000)
+     ,rec25 VARCHAR2(2000)
+     ,rec26 VARCHAR2(2000)
+     ,rec27 VARCHAR2(2000)
+     ,rec28 VARCHAR2(2000)
+     ,rec29 VARCHAR2(2000)
+     ,rec30 VARCHAR2(2000)
+     ,rec31 VARCHAR2(2000)
+     ,rec32 VARCHAR2(2000)
+     ,rec33 VARCHAR2(2000)
+     ,rec34 VARCHAR2(2000)
+     ,rec35 VARCHAR2(2000)
+     ,rec36 VARCHAR2(2000)
+     ,rec37 VARCHAR2(2000)
+     ,rec38 VARCHAR2(2000)
+     ,rec39 VARCHAR2(2000)
+     ,rec40 VARCHAR2(2000)
+     ,rec41 VARCHAR2(2000)
+     ,rec42 VARCHAR2(2000)
+     ,rec43 VARCHAR2(2000)
+     ,rec44 VARCHAR2(2000)
+     ,rec45 VARCHAR2(2000)
+     ,rec46 VARCHAR2(2000)
+     ,rec47 VARCHAR2(2000)
+     ,rec48 VARCHAR2(2000)
+     ,rec49 VARCHAR2(2000)
+     ,rec50 VARCHAR2(2000)
+   );
+
+   TYPE xx_cursor IS REF CURSOR;
+
+   batch_null EXCEPTION;
+
+   v_conn UTL_SMTP.connection;
+   v_smtp_host VARCHAR2(50) := '10.16.1.140';
+   v_crlf VARCHAR2(2)
+      := CHR(13)
+         || CHR(10);
+   v_smtp_port NUMBER := 25;
+   v_attach_path VARCHAR2(200) := 'DIR_FOR_SEND_MAIL1';
+   v_attach_name VARCHAR2(200);
+   v_filehandle UTL_FILE.file_type;
+   v_sql VARCHAR2(32767);
+   v_line VARCHAR2(100);
+   v_db VARCHAR2(200) := apps.fnd_profile.VALUE('APPS_DATABASE_ID');
+
+   v_html CLOB;
+   v_header CLOB;
+   v_temp_count NUMBER;
+   v_batch_id NUMBER;
+   v_column NUMBER;
+   v_delete_sql VARCHAR2(200) := 'DELETE XX_ALERT_TEMP WHERE BATCH_ID = ';
+   v_delete_history VARCHAR2(200) := 'DELETE XX_ALERT_TEMP WHERE BATCH_ID < ';
+   v_count_history VARCHAR2(200) := 'SELECT COUNT(*) FROM XX_ALERT_TEMP WHERE BATCH_ID <';
+   v_count_his NUMBER;
+   v_html_rec NUMBER;
+   v_count_sql VARCHAR2(200) := 'SELECT COUNT(*) FROM XX_ALERT_TEMP WHERE BATCH_ID =';
+   v_init_count NUMBER;
+   v_dymanic_sql VARCHAR2(20000);
+   v_dymanic_column VARCHAR2(20000);
+
+   v_insert_sql VARCHAR2(20000) := 'INSERT INTO XX_ALERT_TEMP(BATCH_ID,SORT_ORDER,';
+
+   chk_box VARCHAR2(200) := '<CENTER><INPUT TYPE="CHECKBOX" ';
+
+
+
+   PROCEDURE init_data_new(p_batch_id     NUMBER
+                          ,p_data         xx_cursor
+                          ,p_colcnt   OUT NUMBER
+                          ,p_msg      OUT VARCHAR2);
+
+
+
+   PROCEDURE column_count(p_sql       VARCHAR2
+                         ,p_count OUT NUMBER
+                         ,p_msg   OUT VARCHAR2);
+
+
+   PROCEDURE create_tempdata(p_batch_id IN     NUMBER
+                            ,p_sql      IN     VARCHAR2
+                            ,p_count       OUT NUMBER
+                            ,p_msg         OUT VARCHAR2);
+
+
+
+   PROCEDURE send_alert(p_subject         VARCHAR2
+                       ,p_rec_list        VARCHAR2
+                       ,p_cc              VARCHAR2
+                       ,p_html_flag       VARCHAR2 DEFAULT 'Y'
+                       ,p_html_rec        NUMBER DEFAULT 50
+                       ,p_excel_flag      VARCHAR2 DEFAULT 'Y'
+                       ,p_delete_flag     VARCHAR2 DEFAULT 'Y'
+                       ,p_data            xx_cursor
+                       ,p_send_nodata     NUMBER
+                       ,p_batch_id    OUT NUMBER
+                       ,p_msg         OUT VARCHAR2);
+
+   FUNCTION check_sql(p_temp  NUMBER)
+      RETURN VARCHAR2;
+
+   FUNCTION return_process_name
+      RETURN VARCHAR2;
+END xx;
+CREATE OR REPLACE PACKAGE BODY apps.xx
+IS
+   PROCEDURE init_data_new(p_batch_id     NUMBER
+                          ,p_data         xx_cursor
+                          ,p_colcnt   OUT NUMBER
+                          ,p_msg      OUT VARCHAR2)
+   IS
+      v_rc xx_cursor;
+      v_c NUMBER;
+      v_colcnt NUMBER;
+      v_desc_tab DBMS_SQL.desc_tab;
+      v_sql VARCHAR2(3000);
+      l_insert_sql VARCHAR2(1000);
+      v_column_name VARCHAR2(3000);
+      v_column_value VARCHAR2(2000);
+      l_value VARCHAR2(200);
+      v_name VARCHAR2(200);
+      v_num NUMBER;
+      v_date DATE;
+      v_count NUMBER := 0;
+   BEGIN
+      v_rc := p_data;
+      v_c := DBMS_SQL.to_cursor_number(v_rc);
+
+      DBMS_SQL.describe_columns(v_c
+                               ,v_colcnt
+                               ,v_desc_tab);
+      p_colcnt := v_colcnt;
+
+      -- insert xx_alert_temp表頭 start--------------------------------------------------------
+      FOR i IN 1 .. v_colcnt
+      LOOP
+         v_sql := v_sql
+                  || 'temp'
+                  || i
+                  || ',';
+         DBMS_OUTPUT.put_line(v_desc_tab(i).col_name);
+         v_column_name := v_column_name
+                          || ''''
+                          || v_desc_tab(i).col_name
+                          || ''''
+                          || ',';
+      END LOOP;
+
+      v_column_name := SUBSTR(v_column_name
+                             ,1
+                             ,  LENGTH(v_column_name)
+                              - 1);
+      v_sql := SUBSTR(v_sql
+                     ,1
+                     ,  LENGTHB(v_sql)
+                      - 1)
+               || ')';
+      l_insert_sql := v_insert_sql
+                      || v_sql
+                      || 'values'
+                      || '('
+                      || p_batch_id
+                      || ',';
+      v_sql := v_insert_sql
+               || v_sql
+               || 'values'
+               || '('
+               || p_batch_id
+               || ','
+               || '0,'
+               || v_column_name
+               || ')';
+
+      DBMS_OUTPUT.enable(10000000);
+
+      --DBMS_OUTPUT.PUT_LINE(v_sql);
+
+      BEGIN
+         EXECUTE IMMEDIATE v_sql; --insert 表頭
+      EXCEPTION
+         WHEN OTHERS
+         THEN
+            p_msg := 'PROCEDURE=>init_data_new error，'
+                     || 'insert表頭錯誤：'
+                     || SQLERRM;
+            RAISE batch_null;
+      END;
+
+      -- insert xx_alert_temp表頭 end--------------------------------------------------------
+
+
+      -- insert xx_alert_temp明細 start--------------------------------------------------------
+      FOR i IN 1 .. v_colcnt
+      LOOP
+         --此處是定義游標中列的讀取類型，可以定義為字符，數字和日期類型
+         IF v_desc_tab(i).col_type = 2
+         THEN
+            DBMS_SQL.define_column(v_c
+                                  ,i
+                                  ,v_num);
+         ELSIF v_desc_tab(i).col_type = 12
+         THEN
+            DBMS_SQL.define_column(v_c
+                                  ,i
+                                  ,v_date);
+         ELSE
+            DBMS_SQL.define_column(v_c
+                                  ,i
+                                  ,v_name
+                                  ,200);
+         END IF;
+      END LOOP;
+
+      -- DBMS_SQL包獲取行
+      --從游標中把數據檢索到緩存區（BUFFER）中，緩衝區 的值只能被函數COULUMN_VALUE()所讀取
+      WHILE DBMS_SQL.fetch_rows(v_c) > 0
+      LOOP
+         v_column_value := '';
+
+         --函數column_value()把緩衝區的列的值讀入相應變量中。
+         FOR i IN 1 .. v_colcnt
+         LOOP
+            l_value := '';
+
+            IF (v_desc_tab(i).col_type = 1)
+            THEN
+               DBMS_SQL.COLUMN_VALUE(v_c
+                                    ,i
+                                    ,v_name);
+               l_value := v_name;
+               DBMS_OUTPUT.put_line(v_name);
+            ELSIF (v_desc_tab(i).col_type = 2)
+            THEN
+               DBMS_SQL.COLUMN_VALUE(v_c
+                                    ,i
+                                    ,v_num);
+               l_value := TO_CHAR(v_num);
+               DBMS_OUTPUT.put_line(v_num);
+            ELSIF (v_desc_tab(i).col_type = 12)
+            THEN
+               DBMS_SQL.COLUMN_VALUE(v_c
+                                    ,i
+                                    ,v_date);
+               l_value := TO_CHAR(v_date
+                                 ,'YYYY-MM-DD HH24:MI:SS');
+               DBMS_OUTPUT.put_line(TO_CHAR(v_date
+                                           ,'YYYY-MM-DD HH24:MI:SS'));
+            ELSE
+               DBMS_SQL.COLUMN_VALUE(v_c
+                                    ,i
+                                    ,v_name);
+               l_value := v_name;
+               DBMS_OUTPUT.put_line(v_name);
+            END IF;
+
+            IF i < v_colcnt
+            THEN
+               v_column_value := v_column_value
+                                 || ''''
+                                 || l_value
+                                 || ''''
+                                 || ',';
+            ELSE
+               v_column_value := v_column_value
+                                 || ''''
+                                 || l_value
+                                 || ''''
+                                 || ')';
+            END IF;
+         END LOOP;
+
+         v_count :=   v_count
+                    + 1;
+
+         DBMS_OUTPUT.put_line(l_insert_sql
+                              || v_count
+                              || ','
+                              || v_column_value);
+
+         BEGIN
+            EXECUTE IMMEDIATE
+               l_insert_sql
+               || v_count
+               || ','
+               || v_column_value; --insert欄位資料
+         EXCEPTION
+            WHEN OTHERS
+            THEN
+               p_msg := 'PROCEDURE=>init_data_new error ：'
+                        || 'insert欄位資料錯誤:'
+                        || SQLERRM;
+               RAISE batch_null;
+         END;
+      END LOOP;
+
+      DBMS_SQL.close_cursor(v_c);
+      --close p_data;
+
+      -- insert xx_alert_temp明細 start--------------------------------------------------------
+
+      COMMIT;
+   EXCEPTION
+      WHEN batch_null
+      THEN
+         DBMS_OUTPUT.put_line(p_msg);
+      WHEN OTHERS
+      THEN
+         p_msg := 'PROCEDURE=>init_data_new error：'
+                  || SQLERRM;
+         DBMS_OUTPUT.put_line(p_msg);
+   END init_data_new;
+
+
+
+   FUNCTION check_sql(p_temp  NUMBER) --檢查XX_ALERT_TEMP
+      RETURN VARCHAR2
+   IS
+      v_flag xx_alert_temp.temp1%TYPE;
+      v_chk_sql VARCHAR2(2000);
+      v_temp_str VARCHAR2(10)
+         := 'temp'
+            || TO_CHAR(p_temp);
+   BEGIN
+      v_chk_sql := 'select distinct '
+                   || v_temp_str
+                   || ' from xx_alert_temp'
+                   || ' where batch_id ='
+                   || v_batch_id
+                   || ' and '
+                   || v_temp_str
+                   || ' is not null '
+                   || ' and sort_order != 1';
+
+      EXECUTE IMMEDIATE v_chk_sql INTO v_flag;
+
+      RETURN (v_flag);
+   EXCEPTION
+      WHEN OTHERS
+      THEN
+         v_flag := 'N';
+         RETURN (v_flag);
+   END check_sql;
+
+
+   PROCEDURE column_count(p_sql       VARCHAR2
+                         ,p_count OUT NUMBER
+                         ,p_msg   OUT VARCHAR2)
+   IS
+      v_sql VARCHAR2(20000);
+   BEGIN
+      p_msg := NULL;
+      v_sql := UPPER(TO_CHAR(p_sql));
+
+      DBMS_OUTPUT.put_line('V_SQL='
+                           || v_sql);
+
+      --DBMS_OUTPUT.PUT_LINE('HERE1');
+      BEGIN
+         SELECT SUBSTR(v_sql
+                      ,8
+                      ,  INSTR(v_sql
+                              ,'FROM')
+                       - 9)
+           INTO v_sql
+           FROM DUAL;
+      EXCEPTION
+         WHEN OTHERS
+         THEN
+            p_msg := 'PROCEDURE=>COLUMN_COUNT ERROR ：'
+                     || SQLERRM;
+            RAISE batch_null;
+      END;
+
+      --DBMS_OUTPUT.PUT_LINE('HERE2');
+      DBMS_OUTPUT.put_line('V_SQL='
+                           || v_sql);
+
+      /*if v_sql like '%*%' or v_sql like '%.*%' then
+         p_msg:='PROCEDURE=>column_count error ：'||'傳入之sql不可以有select *';
+         RAISE batch_null;
+      end if;*/
+
+      --DBMS_OUTPUT.put_line('here3');
+      BEGIN
+         SELECT CASE
+                   WHEN (  LENGTHB(v_sql)
+                         - LENGTHB(REPLACE(v_sql
+                                          ,','
+                                          ,''))) = 0
+                   THEN
+                      0
+                   ELSE
+                        (  LENGTHB(v_sql)
+                         - LENGTHB(REPLACE(v_sql
+                                          ,','
+                                          ,'')))
+                      + 1
+                END
+           INTO p_count
+           FROM DUAL;
+      EXCEPTION
+         WHEN OTHERS
+         THEN
+            p_msg := 'PROCEDURE=>column_count error ：'
+                     || SQLERRM;
+            RAISE batch_null;
+      END;
+
+      --DBMS_OUTPUT.put_line('here4');
+      IF NVL(p_count, 0) <= 0
+      THEN
+         p_msg := 'PROCEDURE=>column_count error ：'
+                  || 'select字樣之後須有欄位 !!';
+         RAISE batch_null;
+      END IF;
+   EXCEPTION
+      WHEN OTHERS
+      THEN
+         p_msg := NVL(p_msg, 'PROCEDURE=>COLUMN_COUNT ERROR !!');
+   END column_count;
+
+
+   PROCEDURE create_tempdata(p_batch_id IN     NUMBER
+                            ,p_sql      IN     VARCHAR2
+                            ,p_count       OUT NUMBER
+                            ,p_msg         OUT VARCHAR2)
+   IS
+      v_sql VARCHAR2(20000);
+      --V_COUNT                                NUMBER;
+      --V_COUNT2                               NUMBER;
+      --V_MSG            VARCHAR2(2000);
+      v_select VARCHAR2(20000);
+      v_sql_upd VARCHAR2(20000);
+      v_insert_sql VARCHAR2(20000) := 'INSERT INTO XX_ALERT_TEMP(BATCH_ID,SORT_ORDER,';
+      v_insert_header_sql VARCHAR2(20000);
+      v_workstr VARCHAR2(20000);
+      v_column_name VARCHAR2(20000);
+   BEGIN
+      column_count(p_sql
+                  ,p_count
+                  ,p_msg);
+
+      IF p_msg IS NOT NULL
+      THEN
+         RAISE batch_null;
+      END IF;
+
+      --DBMS_OUTPUT.put_line('HERE 5');
+      IF p_count > 50
+      THEN
+         p_msg := 'PROCEDURE=>create_tempdata error ：'
+                  || '欄位不可超過50個';
+         RAISE batch_null;
+      END IF;
+
+      --DBMS_OUTPUT.put_line('HERE 6');
+
+
+      v_select := 'SELECT '
+                  || p_batch_id
+                  || ',rownum,';
+
+      v_sql_upd := REPLACE(UPPER(p_sql)
+                          ,'SELECT '
+                          ,v_select);
+
+      v_sql := v_insert_sql;
+
+      FOR i IN 1 .. p_count
+      LOOP
+         v_sql := v_sql
+                  || 'temp'
+                  || i
+                  || ',';
+         v_workstr := REPLACE(UPPER(p_sql)
+                             ,','
+                             ,', ');
+
+         IF i = p_count
+         THEN
+            v_workstr := SUBSTR(v_workstr
+                               ,1
+                               ,  INSTR(v_workstr
+                                       ,'FROM'
+                                       ,1
+                                       ,1)
+                                - 1);
+            v_workstr := RTRIM(v_workstr
+                              ,' ');
+            v_column_name := v_column_name
+                             || ''''
+                             || SUBSTR(v_workstr
+                                      ,  INSTR(v_workstr
+                                              ,' '
+                                              ,-1)
+                                       + 1)
+                             || '''';
+         ELSE
+            v_workstr := SUBSTR(v_workstr
+                               ,1
+                               ,  INSTR(v_workstr
+                                       ,','
+                                       ,1
+                                       ,i)
+                                - 1);
+            v_workstr := RTRIM(v_workstr
+                              ,' ');
+            v_column_name := v_column_name
+                             || ''''
+                             || SUBSTR(v_workstr
+                                      ,  INSTR(v_workstr
+                                              ,' '
+                                              ,-1)
+                                       + 1)
+                             || ''''
+                             || ',';
+         END IF;
+      END LOOP;
+
+      v_sql := SUBSTR(v_sql
+                     ,1
+                     ,  LENGTHB(v_sql)
+                      - 1)
+               || ')';
+
+      v_insert_header_sql := v_sql
+                             || 'values'
+                             || '('
+                             || p_batch_id
+                             || ','
+                             || '0,'
+                             || v_column_name
+                             || ')';
+
+      --dbms_output.put_line(v_insert_header_sql);
+
+      v_sql := v_sql
+               || ' '
+               || v_sql_upd;
+
+      --dbms_output.put_line(v_sql);
+
+      BEGIN
+         EXECUTE IMMEDIATE v_insert_header_sql;
+      EXCEPTION
+         WHEN OTHERS
+         THEN
+            p_msg := 'Err:'
+                     || SQLERRM;
+      --DBMS_OUTPUT.put_line(p_msg);
+      END;
+
+      BEGIN
+         EXECUTE IMMEDIATE v_sql;
+      EXCEPTION
+         WHEN OTHERS
+         THEN
+            p_msg := 'Err:'
+                     || SQLERRM;
+      --DBMS_OUTPUT.put_line(p_msg);
+
+
+
+      END;
+   EXCEPTION
+      WHEN OTHERS
+      THEN
+         p_msg := NVL(p_msg, 'PROCEDURE=>CREATE_TEMPDATA ERROR !!');
+   END create_tempdata;
+
+
+   PROCEDURE send_alert(p_subject         VARCHAR2
+                       , --主題
+                        p_rec_list        VARCHAR2
+                       , --收件者
+                        p_cc              VARCHAR2
+                       , --CC的人
+                        p_html_flag       VARCHAR2 DEFAULT 'Y'
+                       , --是否產生HTML
+                        p_html_rec        NUMBER DEFAULT 50
+                       , --HTML最多列印筆數
+                        p_excel_flag      VARCHAR2 DEFAULT 'Y'
+                       , --是否產生EXCEL檔
+                        p_delete_flag     VARCHAR2 DEFAULT 'Y'
+                       , --是否系統發出信件後刪除資料
+                        p_data            xx_cursor
+                       , --傳入CURSOR
+                        p_send_nodata     NUMBER
+                       , -- 0-代表沒有資料就不發送 1-代表沒有資料仍要發送
+                        p_batch_id    OUT NUMBER
+                       , --BATCH_ID
+                        p_msg         OUT VARCHAR2 --錯誤訊息
+                                                  )
+   IS
+      x xx_cursor;
+      z alert_rec;
+      v_count NUMBER;
+      v_loc NUMBER;
+      v_note VARCHAR2(200);
+      v_prog VARCHAR2(300);
+      v_str VARCHAR2(4000);
+
+      v_strowner VARCHAR2(32767);
+      --V_STRNAME        VARCHAR2(32767);
+      v_nlineno NUMBER;
+      v_strcaller_t VARCHAR2(32767);
+      v_request_id NUMBER;
+      v_concurrent_program_name VARCHAR2(50);
+      v_execution_file_name VARCHAR2(80);
+   BEGIN
+      OWA_UTIL.who_called_me(v_strowner
+                            ,v_prog
+                            ,v_nlineno
+                            ,v_strcaller_t);
+
+      p_batch_id := xx_alert_temp_seq.NEXTVAL;
+
+      v_request_id := apps.fnd_global.conc_request_id;
+
+      IF v_request_id IS NOT NULL
+      THEN
+         BEGIN
+            SELECT '並行程式：'
+                   || NVL(fcp.concurrent_program_name, '*')
+                  ,'執行檔：'
+                   || NVL(e.execution_file_name, '*')
+              INTO v_concurrent_program_name
+                  ,v_execution_file_name
+              FROM fnd_concurrent_requests fcr
+                  ,fnd_concurrent_programs fcp
+                   LEFT OUTER JOIN fnd_executables e
+                      ON fcp.executable_id = e.executable_id
+                         AND fcp.application_id = e.application_id
+             WHERE 1 = 1
+                   AND fcr.concurrent_program_id = fcp.concurrent_program_id
+                   AND fcr.program_application_id = fcp.application_id
+                   AND fcr.request_id = v_request_id;
+         EXCEPTION
+            WHEN NO_DATA_FOUND
+            THEN
+               v_concurrent_program_name := NULL;
+               v_execution_file_name := NULL;
+            WHEN OTHERS
+            THEN
+               p_msg := 'PROCEDURE=>send_alert error：SELECT V_CONCURRENT_PROGRAM_NAME =>'
+                        || SQLERRM;
+               RAISE batch_null;
+         END;
+
+         IF v_execution_file_name IS NOT NULL
+         THEN
+            v_prog := v_execution_file_name;
+         ELSE
+            IF v_concurrent_program_name IS NOT NULL
+            THEN
+               v_prog := v_execution_file_name;
+            ELSE
+               v_prog := '程式：'
+                         || NVL(v_prog, '*');
+            END IF;
+         END IF;
+      END IF;
+
+      --create_tempdata(p_batch_id,p_sql,v_column,p_msg);
+
+      init_data_new(p_batch_id
+                   ,p_data
+                   ,v_column
+                   ,p_msg);
+
+      IF p_msg IS NOT NULL
+      THEN
+         RAISE batch_null;
+      END IF;
+
+      BEGIN
+         EXECUTE IMMEDIATE
+            v_count_sql
+            || p_batch_id
+            INTO v_temp_count;
+      EXCEPTION
+         WHEN OTHERS
+         THEN
+            p_msg := 'PROCEDURE=>SEND_ALERT ERROR ：'
+                     || '計算筆數錯誤:'
+                     || SQLERRM;
+            RAISE batch_null;
+      END;
+
+
+      IF v_temp_count < 0
+      THEN
+         p_msg := 'PROCEDURE=>SEND_ALERT：無資料';
+         RETURN;
+      --RAISE BATCH_NULL;
+      END IF;
+
+      --判斷CURSOR無資料不發送MAIL
+      IF NVL(v_temp_count, 1) = 1
+         AND NVL(p_send_nodata, 0) = 0
+      THEN
+         GOTO the_end;
+      END IF;
+
+      v_html_rec := CASE WHEN p_html_rec > 50 THEN 50 ELSE p_html_rec END;
+
+      v_conn := UTL_SMTP.open_connection(v_smtp_host
+                                        ,v_smtp_port); --開啟 Mail Connection 物件
+      UTL_SMTP.helo(v_conn
+                   ,v_smtp_host); --設定MAIL PORT
+      UTL_SMTP.mail(v_conn
+                   ,'');
+
+      --UTL_SMTP.rcpt (v_conn,'<'||p_rec_list||'>');
+      SELECT DECODE(INSTR(p_rec_list
+                         ,';')
+                   ,0, INSTR(p_rec_list
+                            ,',')
+                   ,INSTR(p_rec_list
+                         ,';'))
+        INTO v_loc
+        FROM DUAL; --取得逗號或分號的位置
+
+      IF v_loc = 0
+      THEN -- 當收件者多位時需要LOOP 一個一個指定,故給第一位收件者,最後讓xxsend_mail 拆分發送給各收件者
+         UTL_SMTP.rcpt(v_conn
+                      ,'<'
+                       || SUBSTR(p_rec_list
+                                ,1)
+                       || '>');
+      ELSE
+         UTL_SMTP.rcpt(v_conn
+                      ,'<'
+                       || SUBSTR(p_rec_list
+                                ,1
+                                ,  v_loc
+                                 - 1)
+                       || '>');
+      END IF;
+
+      UTL_SMTP.open_data(v_conn); --設定 發信內容
+      UTL_SMTP.write_data(v_conn
+                         ,'Content-Type: text/html; charset="utf-8"'
+                          || UTL_TCP.crlf); -- 寫入 Mail Header
+
+      IF NVL(p_html_flag, 'Y') = 'Y'
+      THEN --如果html_flag 等於Y 且 v_temp_count大於v_html_rec 則Mail內容顯示資料超過多少筆 請詳附檔
+         IF v_temp_count > v_html_rec
+         THEN
+            v_note := ' 3.資料超過'
+                      || v_html_rec
+                      || '筆請詳excel附檔 !!<br>';
+         ELSE
+            v_note := '';
+         END IF;
+
+         UTL_SMTP.write_data(v_conn
+                            ,'<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="TEXT/HTML; ">'
+                             || UTL_TCP.crlf
+                             || '<content="MSHTML 6.00.2800.1276" name=GENERATOR>'
+                             || UTL_TCP.crlf
+                             || '<HTML><BODY>');
+
+         v_html := '<div style="font-family:Microsoft JhengHei;font-size:x-small;"> ' --寫入表頭
+                   || '1.本郵件為系統送出,勿直接回信 !!<br>'
+                   || '2.有問題請聯絡資訊部負責人 !!<br> '
+                   || v_note
+                   || UTL_TCP.crlf
+                   || '<center><h4><font color=#000099>'
+                   || p_subject
+                   || '</font></h4></center>';
+
+         UTL_SMTP.write_raw_data(v_conn
+                                ,UTL_RAW.cast_to_raw(CONVERT(v_html
+                                                            ,'ZHT16MSWIN950')));
+         v_html := v_html
+                   || '<TABLE style="font-size:x-small;border:3px #FFAC55 double;padding:1px;" rules="all" cellpadding="1"> <div style="font-family:Microsoft JhengHei;font-size:x-small;">';
+         v_html := v_html
+                   || '<tr BGCOLOR=gray>';
+
+
+         --v_sql := 'select * from xx_alert_temp'
+         v_sql := 'select batch_id,sort_order,temp1,temp2,temp3,temp4,temp5,temp6,temp7,temp8,temp9,temp10,
+                                                temp11,temp12,temp13,temp14,temp15,temp16,temp17,temp18,temp19,temp20,
+                                                temp21,temp22,temp23,temp24,temp25,temp26,temp27,temp28,temp29,temp30,
+                                                temp31,temp32,temp33,temp34,temp35,temp36,temp37,temp38,temp39,temp40,
+                                                temp41,temp42,temp43,temp44,temp45,temp46,temp47,temp48,temp49,temp50
+                   from xx_alert_temp'
+                  || ' where batch_id ='
+                  || p_batch_id
+                  || ' order by sort_order';
+
+
+         OPEN x FOR v_sql;
+
+         LOOP
+            FETCH x INTO z;
+
+            EXIT WHEN x%NOTFOUND;
+
+            IF z.sort_order = 0
+            THEN --寫入欄位表頭
+               v_html := v_html
+                         || '<th><b><font color=white>No.</font></th>';
+
+               FOR k IN 1 .. v_column
+               LOOP
+                  v_html := v_html
+                            || '<th><b><font color=white>'
+                            || CASE
+                                  WHEN k = 1 THEN z.rec1
+                                  WHEN k = 2 THEN z.rec2
+                                  WHEN k = 3 THEN z.rec3
+                                  WHEN k = 4 THEN z.rec4
+                                  WHEN k = 5 THEN z.rec5
+                                  WHEN k = 6 THEN z.rec6
+                                  WHEN k = 7 THEN z.rec7
+                                  WHEN k = 8 THEN z.rec8
+                                  WHEN k = 9 THEN z.rec9
+                                  WHEN k = 10 THEN z.rec10
+                                  WHEN k = 11 THEN z.rec11
+                                  WHEN k = 12 THEN z.rec12
+                                  WHEN k = 13 THEN z.rec13
+                                  WHEN k = 14 THEN z.rec14
+                                  WHEN k = 15 THEN z.rec15
+                                  WHEN k = 16 THEN z.rec16
+                                  WHEN k = 17 THEN z.rec17
+                                  WHEN k = 18 THEN z.rec18
+                                  WHEN k = 19 THEN z.rec19
+                                  WHEN k = 20 THEN z.rec20
+                                  WHEN k = 21 THEN z.rec21
+                                  WHEN k = 22 THEN z.rec22
+                                  WHEN k = 23 THEN z.rec23
+                                  WHEN k = 24 THEN z.rec24
+                                  WHEN k = 25 THEN z.rec25
+                                  WHEN k = 26 THEN z.rec26
+                                  WHEN k = 27 THEN z.rec27
+                                  WHEN k = 28 THEN z.rec28
+                                  WHEN k = 29 THEN z.rec29
+                                  WHEN k = 30 THEN z.rec30
+                                  WHEN k = 31 THEN z.rec31
+                                  WHEN k = 32 THEN z.rec32
+                                  WHEN k = 33 THEN z.rec33
+                                  WHEN k = 34 THEN z.rec34
+                                  WHEN k = 35 THEN z.rec35
+                                  WHEN k = 36 THEN z.rec36
+                                  WHEN k = 37 THEN z.rec37
+                                  WHEN k = 38 THEN z.rec38
+                                  WHEN k = 39 THEN z.rec39
+                                  WHEN k = 40 THEN z.rec40
+                                  WHEN k = 41 THEN z.rec41
+                                  WHEN k = 42 THEN z.rec42
+                                  WHEN k = 43 THEN z.rec43
+                                  WHEN k = 44 THEN z.rec44
+                                  WHEN k = 45 THEN z.rec45
+                                  WHEN k = 46 THEN z.rec46
+                                  WHEN k = 47 THEN z.rec47
+                                  WHEN k = 48 THEN z.rec48
+                                  WHEN k = 49 THEN z.rec49
+                                  WHEN k = 50 THEN z.rec50
+                               END
+                            || '</font></th>';
+               END LOOP;
+            ELSE
+               v_html := v_html
+                         || HTF.tablerowopen; --寫入明細
+               v_count :=   NVL(v_count, 0)
+                          + 1;
+               v_html := v_html
+                         || HTF.tabledata(CASE
+                                             WHEN MOD(v_count
+                                                     ,5) = 0
+                                             THEN
+                                                '<tr BGCOLOR=#A3A3FF>'
+                                          END --每5筆設定背景顏色為#A3A3FF
+                                          || HTF.escape_sc(v_count));
+
+
+               FOR j IN 1 .. v_column
+               LOOP
+                  v_html := v_html
+                            || HTF.tabledata(
+                                  CASE
+                                     WHEN check_sql(j) = 'V'
+                                     THEN
+                                        chk_box
+                                        || CASE
+                                              WHEN z.rec1 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec2 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec3 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec4 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec5 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec6 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec7 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec8 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec9 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec10 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec11 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec12 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec13 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec14 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec15 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec16 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec17 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec18 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec19 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec20 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec21 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec22 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec23 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec24 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec25 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec26 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec27 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec28 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec29 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec30 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec31 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec32 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec33 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec34 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec35 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec36 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec37 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec38 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec39 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec40 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec41 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec42 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec43 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec44 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec45 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec46 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec47 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec48 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec49 = 'V' THEN 'CHECKED>'
+                                              WHEN z.rec50 = 'V' THEN 'CHECKED>'
+                                              ELSE 'UNCHCKED>'
+                                           END
+                                     ELSE
+                                        HTF.escape_sc(
+                                           CASE
+                                              WHEN j = 1 THEN z.rec1
+                                              WHEN j = 2 THEN z.rec2
+                                              WHEN j = 3 THEN z.rec3
+                                              WHEN j = 4 THEN z.rec4
+                                              WHEN j = 5 THEN z.rec5
+                                              WHEN j = 6 THEN z.rec6
+                                              WHEN j = 7 THEN z.rec7
+                                              WHEN j = 8 THEN z.rec8
+                                              WHEN j = 9 THEN z.rec9
+                                              WHEN j = 10 THEN z.rec10
+                                              WHEN j = 11 THEN z.rec11
+                                              WHEN j = 12 THEN z.rec12
+                                              WHEN j = 13 THEN z.rec13
+                                              WHEN j = 14 THEN z.rec14
+                                              WHEN j = 15 THEN z.rec15
+                                              WHEN j = 16 THEN z.rec16
+                                              WHEN j = 17 THEN z.rec17
+                                              WHEN j = 18 THEN z.rec18
+                                              WHEN j = 19 THEN z.rec19
+                                              WHEN j = 20 THEN z.rec20
+                                              WHEN j = 21 THEN z.rec21
+                                              WHEN j = 22 THEN z.rec22
+                                              WHEN j = 23 THEN z.rec23
+                                              WHEN j = 24 THEN z.rec24
+                                              WHEN j = 25 THEN z.rec25
+                                              WHEN j = 26 THEN z.rec26
+                                              WHEN j = 27 THEN z.rec27
+                                              WHEN j = 28 THEN z.rec28
+                                              WHEN j = 29 THEN z.rec29
+                                              WHEN j = 30 THEN z.rec30
+                                              WHEN j = 31 THEN z.rec31
+                                              WHEN j = 32 THEN z.rec32
+                                              WHEN j = 33 THEN z.rec33
+                                              WHEN j = 34 THEN z.rec34
+                                              WHEN j = 35 THEN z.rec35
+                                              WHEN j = 36 THEN z.rec36
+                                              WHEN j = 37 THEN z.rec37
+                                              WHEN j = 38 THEN z.rec38
+                                              WHEN j = 39 THEN z.rec39
+                                              WHEN j = 40 THEN z.rec40
+                                              WHEN j = 41 THEN z.rec41
+                                              WHEN j = 42 THEN z.rec42
+                                              WHEN j = 43 THEN z.rec43
+                                              WHEN j = 44 THEN z.rec44
+                                              WHEN j = 45 THEN z.rec45
+                                              WHEN j = 46 THEN z.rec46
+                                              WHEN j = 47 THEN z.rec47
+                                              WHEN j = 48 THEN z.rec48
+                                              WHEN j = 49 THEN z.rec49
+                                              WHEN j = 50 THEN z.rec50
+                                           END)
+                                  END);
+               END LOOP;
+            END IF;
+
+            EXIT WHEN v_count = v_html_rec;
+         END LOOP;
+
+         CLOSE x;
+
+         UTL_SMTP.write_raw_data(v_conn
+                                ,UTL_RAW.cast_to_raw(CONVERT(v_html
+                                                            ,'ZHT16MSWIN950')));
+         UTL_SMTP.write_data(v_conn
+                            ,UTL_TCP.crlf
+                             || UTL_TCP.crlf);
+         v_html := v_html
+                   || HTF.tableclose
+                   || '<div style="font-family:Microsoft JhengHei;font-size:x-small;"> ' --寫入表頭
+                   || v_prog
+                   || '<br>'
+                   || 'REQUEST ID：'
+                   || TO_CHAR(v_request_id)
+                   || '</div>'
+                   || '</body></html>'
+                   || UTL_TCP.crlf;
+      END IF;
+
+
+      IF NVL(p_excel_flag, 'Y') = 'Y'
+      THEN --如果excel_flag 等於Y 及 v_temp_count大於v_html_rec ，則產生excel檔
+         --IF v_temp_count > v_html_rec THEN
+         v_attach_name := v_prog
+                          || '_'
+                          || v_db
+                          || '_'
+                          || TO_CHAR(SYSDATE
+                                    ,'yymmddhh24miss')
+                          || '.xls';
+
+         v_filehandle := UTL_FILE.fopen(v_attach_path
+                                       ,v_attach_name
+                                       ,'W'
+                                       ,32767);
+
+         OPEN x FOR v_sql;
+
+         LOOP
+            FETCH x INTO z;
+
+            EXIT WHEN x%NOTFOUND;
+
+            v_header := CASE WHEN z.sort_order = 0 THEN 'No.' ELSE TO_CHAR(z.sort_order) END
+                        || CHR(9)
+                        || CASE WHEN v_column > 0 THEN z.rec1 END
+                        || CASE
+                              WHEN v_column > 1
+                              THEN
+                                 CHR(9)
+                                 || z.rec2
+                           END
+                        || CASE
+                              WHEN v_column > 2
+                              THEN
+                                 CHR(9)
+                                 || z.rec3
+                           END
+                        || CASE
+                              WHEN v_column > 3
+                              THEN
+                                 CHR(9)
+                                 || z.rec4
+                           END
+                        || CASE
+                              WHEN v_column > 4
+                              THEN
+                                 CHR(9)
+                                 || z.rec5
+                           END
+                        || CASE
+                              WHEN v_column > 5
+                              THEN
+                                 CHR(9)
+                                 || z.rec6
+                           END
+                        || CASE
+                              WHEN v_column > 6
+                              THEN
+                                 CHR(9)
+                                 || z.rec7
+                           END
+                        || CASE
+                              WHEN v_column > 7
+                              THEN
+                                 CHR(9)
+                                 || z.rec8
+                           END
+                        || CASE
+                              WHEN v_column > 8
+                              THEN
+                                 CHR(9)
+                                 || z.rec9
+                           END
+                        || CASE
+                              WHEN v_column > 9
+                              THEN
+                                 CHR(9)
+                                 || z.rec10
+                           END
+                        || CASE
+                              WHEN v_column > 10
+                              THEN
+                                 CHR(9)
+                                 || z.rec11
+                           END
+                        || CASE
+                              WHEN v_column > 11
+                              THEN
+                                 CHR(9)
+                                 || z.rec12
+                           END
+                        || CASE
+                              WHEN v_column > 12
+                              THEN
+                                 CHR(9)
+                                 || z.rec13
+                           END
+                        || CASE
+                              WHEN v_column > 13
+                              THEN
+                                 CHR(9)
+                                 || z.rec14
+                           END
+                        || CASE
+                              WHEN v_column > 14
+                              THEN
+                                 CHR(9)
+                                 || z.rec15
+                           END
+                        || CASE
+                              WHEN v_column > 15
+                              THEN
+                                 CHR(9)
+                                 || z.rec16
+                           END
+                        || CASE
+                              WHEN v_column > 16
+                              THEN
+                                 CHR(9)
+                                 || z.rec17
+                           END
+                        || CASE
+                              WHEN v_column > 17
+                              THEN
+                                 CHR(9)
+                                 || z.rec18
+                           END
+                        || CASE
+                              WHEN v_column > 18
+                              THEN
+                                 CHR(9)
+                                 || z.rec19
+                           END
+                        || CASE
+                              WHEN v_column > 19
+                              THEN
+                                 CHR(9)
+                                 || z.rec20
+                           END
+                        || CASE
+                              WHEN v_column > 20
+                              THEN
+                                 CHR(9)
+                                 || z.rec21
+                           END
+                        || CASE
+                              WHEN v_column > 21
+                              THEN
+                                 CHR(9)
+                                 || z.rec22
+                           END
+                        || CASE
+                              WHEN v_column > 22
+                              THEN
+                                 CHR(9)
+                                 || z.rec23
+                           END
+                        || CASE
+                              WHEN v_column > 23
+                              THEN
+                                 CHR(9)
+                                 || z.rec24
+                           END
+                        || CASE
+                              WHEN v_column > 24
+                              THEN
+                                 CHR(9)
+                                 || z.rec25
+                           END
+                        || CASE
+                              WHEN v_column > 25
+                              THEN
+                                 CHR(9)
+                                 || z.rec26
+                           END
+                        || CASE
+                              WHEN v_column > 26
+                              THEN
+                                 CHR(9)
+                                 || z.rec27
+                           END
+                        || CASE
+                              WHEN v_column > 27
+                              THEN
+                                 CHR(9)
+                                 || z.rec28
+                           END
+                        || CASE
+                              WHEN v_column > 28
+                              THEN
+                                 CHR(9)
+                                 || z.rec29
+                           END
+                        || CASE
+                              WHEN v_column > 29
+                              THEN
+                                 CHR(9)
+                                 || z.rec30
+                           END
+                        || CASE
+                              WHEN v_column > 30
+                              THEN
+                                 CHR(9)
+                                 || z.rec31
+                           END
+                        || CASE
+                              WHEN v_column > 31
+                              THEN
+                                 CHR(9)
+                                 || z.rec32
+                           END
+                        || CASE
+                              WHEN v_column > 32
+                              THEN
+                                 CHR(9)
+                                 || z.rec33
+                           END
+                        || CASE
+                              WHEN v_column > 33
+                              THEN
+                                 CHR(9)
+                                 || z.rec34
+                           END
+                        || CASE
+                              WHEN v_column > 34
+                              THEN
+                                 CHR(9)
+                                 || z.rec35
+                           END
+                        || CASE
+                              WHEN v_column > 35
+                              THEN
+                                 CHR(9)
+                                 || z.rec36
+                           END
+                        || CASE
+                              WHEN v_column > 36
+                              THEN
+                                 CHR(9)
+                                 || z.rec37
+                           END
+                        || CASE
+                              WHEN v_column > 37
+                              THEN
+                                 CHR(9)
+                                 || z.rec38
+                           END
+                        || CASE
+                              WHEN v_column > 38
+                              THEN
+                                 CHR(9)
+                                 || z.rec39
+                           END
+                        || CASE
+                              WHEN v_column > 39
+                              THEN
+                                 CHR(9)
+                                 || z.rec40
+                           END
+                        || CASE
+                              WHEN v_column > 40
+                              THEN
+                                 CHR(9)
+                                 || z.rec41
+                           END
+                        || CASE
+                              WHEN v_column > 41
+                              THEN
+                                 CHR(9)
+                                 || z.rec42
+                           END
+                        || CASE
+                              WHEN v_column > 42
+                              THEN
+                                 CHR(9)
+                                 || z.rec43
+                           END
+                        || CASE
+                              WHEN v_column > 43
+                              THEN
+                                 CHR(9)
+                                 || z.rec44
+                           END
+                        || CASE
+                              WHEN v_column > 44
+                              THEN
+                                 CHR(9)
+                                 || z.rec45
+                           END
+                        || CASE
+                              WHEN v_column > 45
+                              THEN
+                                 CHR(9)
+                                 || z.rec46
+                           END
+                        || CASE
+                              WHEN v_column > 46
+                              THEN
+                                 CHR(9)
+                                 || z.rec47
+                           END
+                        || CASE
+                              WHEN v_column > 47
+                              THEN
+                                 CHR(9)
+                                 || z.rec48
+                           END
+                        || CASE
+                              WHEN v_column > 48
+                              THEN
+                                 CHR(9)
+                                 || z.rec49
+                           END
+                        || CASE
+                              WHEN v_column > 49
+                              THEN
+                                 CHR(9)
+                                 || z.rec50
+                           END;
+
+            UTL_FILE.put_line(v_filehandle
+                             ,CONVERT(v_header
+                                     ,'ZHT16BIG5'));
+
+            EXIT WHEN z.sort_order =   v_init_count
+                                     + 1;
+         END LOOP;
+
+         UTL_FILE.put_line(v_filehandle
+                          ,CHR(0));
+         UTL_FILE.fclose(v_filehandle);
+
+         CLOSE x;
+      --END IF;
+      END IF;
+
+      apps.send_mail(p_subject
+                      ,v_html
+                      ,p_rec_list
+                      ,p_cc
+                      ,v_attach_path
+                      ,v_attach_name);
+
+      UTL_SMTP.close_connection(v_conn);
+
+     <<THE_END>>
+      IF NVL(p_delete_flag, 'Y') = 'Y'
+      THEN --如果DELETE_FLAG 等於 Y 則刪除XX_ALERT_TEMP該BATCH_ID 底下的資料
+         BEGIN
+            EXECUTE IMMEDIATE
+               v_delete_sql
+               || p_batch_id;
+
+            COMMIT;
+         EXCEPTION
+            WHEN OTHERS
+            THEN
+               p_msg := 'PROCEDURE=>SEND_ALERT ERROR：'
+                        || '刪除TEMP檔錯誤'
+                        || SQLERRM;
+               ROLLBACK;
+               RAISE batch_null;
+         END;
+      END IF;
+
+
+      BEGIN
+         EXECUTE IMMEDIATE
+            v_delete_history
+            || p_batch_id
+            || '-100';
+
+         COMMIT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            NULL;
+         WHEN OTHERS
+         THEN
+            p_msg := 'PROCEDURE=>SEND_ALERT ERROR：'
+                     || '刪除TEMP檔歷史資料錯誤'
+                     || SQLERRM;
+            ROLLBACK;
+            RAISE batch_null;
+      END;
+
+      v_str := 'EXETIME:'
+               || TO_CHAR(SYSDATE
+                         ,'DD-MON-YY HH24:MI:SS')
+               || CHR(10)
+               || 'BATCHID:'
+               || p_batch_id
+               || ','
+               || SQLERRM
+               || CHR(10);
+
+      --DBMS_OUTPUT.put_line (v_str);
+
+      fnd_file.put_line(fnd_file.LOG
+                       ,v_str);
+   EXCEPTION
+      WHEN batch_null
+      THEN
+         DBMS_OUTPUT.put_line(p_msg);
+      WHEN OTHERS
+      THEN
+         p_msg := NVL(p_msg
+                     ,'PROCEDURE=>SEND_ALERT ERROR !!'
+                      || SQLERRM);
+         --DBMS_OUTPUT.PUT_LINE (V_STR|| P_MSG);
+
+         fnd_file.put_line(fnd_file.LOG
+                          ,v_str
+                           || p_msg);
+   END send_alert;
+
+
+   FUNCTION return_process_name
+      RETURN VARCHAR2
+   IS
+      strowner VARCHAR2(32767);
+      strname VARCHAR2(32767);
+      nlineno NUMBER;
+      strcaller_t VARCHAR2(32767);
+      p_msg VARCHAR2(32767);
+   BEGIN
+      OWA_UTIL.who_called_me(strowner
+                            ,strname
+                            ,nlineno
+                            ,strcaller_t);
+
+      RETURN strname;
+   EXCEPTION
+      WHEN OTHERS
+      THEN
+         p_msg := NVL(p_msg, 'PROCEDURE=>RETURN_PROCESS_NAME ERROR !!');
+   --DBMS_OUTPUT.PUT_LINE (P_MSG);
+   END return_process_name;
+END xx;
+
+
 DECLARE
    p_sub VARCHAR2(20000);
    --郵件標題
