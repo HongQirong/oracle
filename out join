@@ -1,0 +1,9 @@
+SELECT *
+  FROM (SELECT 'a' a
+              ,'b' b
+          FROM DUAL) e
+      ,(SELECT 'c' y
+              ,'d' z
+          FROM DUAL) f
+ WHERE e.a(+)=f.z
+ and z not in (select 'a'  from dual)
