@@ -1,0 +1,40 @@
+DECLARE
+   p_errbuf VARCHAR2(1000);
+   p_retcode VARCHAR2(1000);
+   p_message VARCHAR2(1000);
+   p_custphone VARCHAR2(1000);
+
+   req UTL_HTTP.req;
+   resp UTL_HTTP.resp;
+   VALUE VARCHAR2(1024);
+   url VARCHAR2(1000);
+BEGIN
+
+   url := 'https://www.google.com/';
+   url := CONVERT(url
+                  || ' '
+                 ,'ZHT16MSWIN950'
+                 ,'UTF8');
+   --UTL_HTTP.SET_PROXY('');
+   req := UTL_HTTP.begin_request(url);
+   UTL_HTTP.set_header(req
+                      ,'User-Agent'
+                      ,'Mozilla/4.0');
+   resp := UTL_HTTP.get_response(req);
+
+   LOOP
+      UTL_HTTP.read_line(resp
+                        ,VALUE
+                        ,TRUE);
+      DBMS_OUTPUT.put_line(VALUE);
+   END LOOP;
+
+   UTL_HTTP.end_response(resp);
+EXCEPTION
+   WHEN UTL_HTTP.end_of_body
+   THEN
+      UTL_HTTP.end_response(resp);
+   WHEN OTHERS
+   THEN
+      DBMS_OUTPUT.put_line(UTL_HTTP.get_detailed_sqlerrm);
+END send_url;
