@@ -1,3 +1,7 @@
 SELECT DISTINCT (us.name)
   FROM user_source us
  WHERE UPPER (us.TEXT) LIKE UPPER ('%') AND us.name LIKE '%';
+
+SELECT DISTINCT (us.name)
+  FROM all_source us
+ WHERE UPPER (us.TEXT) LIKE UPPER ('%RAISE_APPLICATION_ERROR%') AND us.name LIKE 'XX%';
