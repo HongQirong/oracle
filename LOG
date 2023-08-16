@@ -1,0 +1,51 @@
+CREATE TABLE APPS.XXFND_LOG
+(
+  LOG_SEQ           NUMBER,
+  MSG               CLOB,
+  CREATION_DATE     DATE                        DEFAULT sysdate,
+  LAST_UPDATE_DATE  DATE                        DEFAULT sysdate
+);
+CREATE SEQUENCE APPS.XXFND_LOG_S
+  START WITH 5
+  MAXVALUE 999999999999999999999999999
+  MINVALUE 1
+  NOCYCLE
+  CACHE 2
+  NOORDER;
+
+CREATE OR REPLACE PACKAGE BODY xxfnd_log_pkg
+IS
+   PROCEDURE put_line(p_log_seq IN OUT NUMBER
+                     ,p_msg     IN     VARCHAR2)
+   IS
+      PRAGMA AUTONOMOUS_TRANSACTION;
+   BEGIN
+      IF p_log_seq IS NULL
+      THEN
+         SELECT xxfnd_log_s.NEXTVAL INTO p_log_seq FROM DUAL;
+
+         INSERT INTO xxfnd_log(log_seq
+                              ,msg)
+            SELECT p_log_seq
+                  ,p_msg
+              FROM DUAL;
+      ELSE
+         UPDATE xxfnd_log
+            SET msg = msg
+                      || CHR(10)
+                      || p_msg
+          WHERE log_seq = p_log_seq;
+      END IF;
+
+      COMMIT;
+   --      DECLARE
+   --         v_log_seq NUMBER;
+   --      BEGIN
+   --         xxfnd_log_pkg.put_line(p_log_seq => v_log_seq
+   --                               ,p_msg => 'test3');
+   --
+   --         xxfnd_log_pkg.put_line(p_log_seq => v_log_seq
+   --                               ,p_msg => 'test4');
+   --      END;
+   END put_line;
+END xxfnd_log_pkg;
