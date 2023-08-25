@@ -1,11 +1,29 @@
-CREATE TABLE APPS.XXFND_LOG
+ALTER TABLE xxfnd_log
+   DROP PRIMARY KEY CASCADE;
+
+DROP TABLE xxfnd_log CASCADE CONSTRAINTS;
+
+CREATE TABLE xxfnd_log
 (
-  LOG_SEQ           NUMBER,
-  MSG               CLOB,
-  CREATION_DATE     DATE                        DEFAULT sysdate,
-  LAST_UPDATE_DATE  DATE                        DEFAULT sysdate
+   log_seq NUMBER
+  ,msg CLOB NOT NULL
+  ,creation_date DATE DEFAULT SYSDATE NOT NULL
+  ,last_update_date DATE DEFAULT SYSDATE NOT NULL
+  ,program_name VARCHAR2(360 BYTE) NOT NULL
 );
-CREATE SEQUENCE APPS.XXFND_LOG_S
+
+CREATE UNIQUE INDEX xxfnd_log_pk
+   ON xxfnd_log(log_seq);
+
+
+ALTER TABLE  xxfnd_log ADD (
+  CONSTRAINT xxfnd_log_pk
+  PRIMARY KEY
+  (log_seq)
+  USING INDEX  xxfnd_log_pk
+  ENABLE VALIDATE);
+
+CREATE SEQUENCE XXFND_LOG_S
   START WITH 5
   MAXVALUE 999999999999999999999999999
   MINVALUE 1
@@ -15,8 +33,10 @@ CREATE SEQUENCE APPS.XXFND_LOG_S
 
 CREATE OR REPLACE PACKAGE BODY xxfnd_log_pkg
 IS
-   PROCEDURE put_line(p_log_seq IN OUT NUMBER
-                     ,p_msg     IN     VARCHAR2)
+   PROCEDURE put_line(p_log_seq      IN OUT NUMBER --log的序號，若要記錄在同一個log中，需沿用在第一次呼叫時回傳的序號，
+                     ,p_program_name IN     VARCHAR2 --p_log_seq沒有值時，表示還沒有log，這時才會使用此參數，用來記錄是哪一個程式的log
+                     ,p_msg          IN     VARCHAR2 --log訊息
+                                                    )
    IS
       PRAGMA AUTONOMOUS_TRANSACTION;
    BEGIN
@@ -25,8 +45,10 @@ IS
          SELECT xxfnd_log_s.NEXTVAL INTO p_log_seq FROM DUAL;
 
          INSERT INTO xxfnd_log(log_seq
+                              ,program_name
                               ,msg)
             SELECT p_log_seq
+                  ,p_program_name
                   ,p_msg
               FROM DUAL;
       ELSE
@@ -34,18 +56,11 @@ IS
             SET msg = msg
                       || CHR(10)
                       || p_msg
+               ,last_update_date = SYSDATE
           WHERE log_seq = p_log_seq;
       END IF;
 
       COMMIT;
-   --      DECLARE
-   --         v_log_seq NUMBER;
-   --      BEGIN
-   --         xxfnd_log_pkg.put_line(p_log_seq => v_log_seq
-   --                               ,p_msg => 'test3');
-   --
-   --         xxfnd_log_pkg.put_line(p_log_seq => v_log_seq
-   --                               ,p_msg => 'test4');
-   --      END;
    END put_line;
 END xxfnd_log_pkg;
+/
