@@ -3,14 +3,41 @@ ALTER TABLE xxfnd_log
 
 DROP TABLE xxfnd_log CASCADE CONSTRAINTS;
 
-CREATE TABLE xxfnd_log
+CREATE TABLE xx.XXFND_LOG
 (
-   log_seq NUMBER
-  ,msg CLOB NOT NULL
-  ,creation_date DATE DEFAULT SYSDATE NOT NULL
-  ,last_update_date DATE DEFAULT SYSDATE NOT NULL
-  ,program_name VARCHAR2(360 BYTE) NOT NULL
+  LOG_SEQ            NUMBER,
+  MSG                CLOB                       NOT NULL,
+  CREATION_DATE      DATE                       DEFAULT SYSDATE               NOT NULL,
+  LAST_UPDATE_DATE   DATE                       DEFAULT SYSDATE               NOT NULL,
+  PROGRAM_NAME       VARCHAR2(360 BYTE)         NOT NULL,
+  CREATED_BY         NUMBER                     DEFAULT -1                    NOT NULL,
+  LAST_UPDATED_BY    NUMBER                     DEFAULT -1                    NOT NULL,
+  LAST_UPDATE_LOGIN  NUMBER                     DEFAULT -1                    NOT NULL
 );
+
+CREATE INDEX xx.XXFND_LOG_N1 ON xx.XXFND_LOG
+(PROGRAM_NAME);
+
+CREATE INDEX xx.XXFND_LOG_N2 ON xx.XXFND_LOG
+(CREATION_DATE);
+
+CREATE INDEX xx.XXFND_LOG_N3 ON xx.XXFND_LOG
+(CREATED_BY);
+
+CREATE INDEX xx.XXFND_LOG_N4 ON xx.XXFND_LOG
+(LAST_UPDATED_BY);
+
+CREATE INDEX xx.XXFND_LOG_N5 ON xx.XXFND_LOG
+(PROGRAM_NAME, CREATION_DATE, CREATED_BY);
+
+CREATE INDEX xx.XXFND_LOG_N6 ON xx.XXFND_LOG
+(PROGRAM_NAME, LAST_UPDATE_DATE, LAST_UPDATED_BY);
+
+CREATE INDEX xx.XXFND_LOG_N7 ON xx.XXFND_LOG
+(PROGRAM_NAME, CREATION_DATE);
+
+CREATE INDEX xx.XXFND_LOG_N8 ON xx.XXFND_LOG
+(PROGRAM_NAME, LAST_UPDATE_DATE);
 
 CREATE UNIQUE INDEX xxfnd_log_pk
    ON xxfnd_log(log_seq);
@@ -31,36 +58,61 @@ CREATE SEQUENCE XXFND_LOG_S
   CACHE 2
   NOORDER;
 
-CREATE OR REPLACE PACKAGE BODY xxfnd_log_pkg
+CREATE OR REPLACE PACKAGE BODY xx.xxfnd_log_pkg
 IS
    PROCEDURE put_line(p_log_seq      IN OUT NUMBER --log的序號，若要記錄在同一個log中，需沿用在第一次呼叫時回傳的序號，
                      ,p_program_name IN     VARCHAR2 --p_log_seq沒有值時，表示還沒有log，這時才會使用此參數，用來記錄是哪一個程式的log
+                     ,p_user_id      IN     NUMBER --ERP的user_id
+                     ,p_login_id     IN     NUMBER --ERP的login_id
                      ,p_msg          IN     VARCHAR2 --log訊息
                                                     )
    IS
       PRAGMA AUTONOMOUS_TRANSACTION;
+      v_user_id NUMBER := NVL(p_user_id, apps.fnd_global.user_id);
+      v_login_id NUMBER := NVL(p_login_id, apps.fnd_global.login_id);
    BEGIN
-      IF p_log_seq IS NULL
+      IF p_log_seq IS NULL --p_log_seq沒有值表示還未有log，建新的log
       THEN
-         SELECT xxfnd_log_s.NEXTVAL INTO p_log_seq FROM DUAL;
+         SELECT xx.xxfnd_log_s.NEXTVAL INTO p_log_seq FROM DUAL; --取流水號
 
-         INSERT INTO xxfnd_log(log_seq
-                              ,program_name
-                              ,msg)
+         INSERT INTO xx.xxfnd_log(log_seq
+                                     ,program_name
+                                     ,created_by
+                                     ,last_updated_by
+                                     ,last_update_login
+                                     ,msg)
             SELECT p_log_seq
                   ,p_program_name
+                  ,v_user_id
+                  ,v_user_id
+                  ,v_login_id
                   ,p_msg
               FROM DUAL;
-      ELSE
-         UPDATE xxfnd_log
+      ELSE --p_log_seq有值表示已有log，更新log
+         UPDATE xx.xxfnd_log
             SET msg = msg
                       || CHR(10)
                       || p_msg
                ,last_update_date = SYSDATE
+               ,last_updated_by = v_user_id
+               ,last_update_login = v_login_id
           WHERE log_seq = p_log_seq;
       END IF;
 
       COMMIT;
+   --測試用
+   --      DECLARE
+   --         v_log_seq NUMBER;
+   --         v_program_name VARCHAR2(100) := 'TEST';
+   --         v_user_id NUMBER := apps.fnd_global.user_id;
+   --         v_login_id NUMBER := apps.fnd_global.login_id;
+   --      BEGIN
+   --         xx.xxfnd_log_pkg.put_line(p_log_seq => v_log_seq
+   --                                      ,p_program_name => v_program_name
+   --                                      ,p_user_id => v_user_id
+   --                                      ,p_login_id => v_login_id
+   --                                      ,p_msg => 'TEST');
+   --      END;
    END put_line;
 END xxfnd_log_pkg;
 /
