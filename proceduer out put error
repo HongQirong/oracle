@@ -73,3 +73,23 @@ EXCEPTION
                      || DBMS_UTILITY.format_error_backtrace
                      || DBMS_UTILITY.format_call_stack;
 END;
+
+   PROCEDURE raise_application_error_form(p_error_msg   IN VARCHAR2
+                                         ,p_newline_cnt IN NUMBER)
+   IS
+      v__error_msg VARCHAR2(32767) := p_error_msg;
+   BEGIN
+      FOR r_cnt IN 1 .. p_newline_cnt
+      LOOP
+         v__error_msg := v__error_msg
+                         || CHR(10);
+      END LOOP;
+
+      raise_application_error(-20000
+                             ,v__error_msg
+                              || '此次執行的程式:'
+                              || CHR(10)
+                              || DBMS_UTILITY.format_error_stack
+                              || DBMS_UTILITY.format_error_backtrace
+                              || DBMS_UTILITY.format_call_stack);
+   END raise_application_error_form;
