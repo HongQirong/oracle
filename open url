@@ -1,40 +1,71 @@
 DECLARE
    p_errbuf VARCHAR2(1000);
    p_retcode VARCHAR2(1000);
-   p_message VARCHAR2(1000);
-   p_custphone VARCHAR2(1000);
+   p_result VARCHAR2(1000); --S是成功，E是錯誤
+   p_err_msg VARCHAR2(1000);
 
    req UTL_HTTP.req;
    resp UTL_HTTP.resp;
    VALUE VARCHAR2(1024);
    url VARCHAR2(1000);
+   v_err_msg VARCHAR2(32767);
+   v_error EXCEPTION;
 BEGIN
+   p_result := 'E';
 
    url := 'https://www.google.com/';
    url := CONVERT(url
                   || ' '
                  ,'ZHT16MSWIN950'
                  ,'UTF8');
+
    --UTL_HTTP.SET_PROXY('');
-   req := UTL_HTTP.begin_request(url);
-   UTL_HTTP.set_header(req
-                      ,'User-Agent'
-                      ,'Mozilla/4.0');
-   resp := UTL_HTTP.get_response(req);
+   BEGIN
+      req := UTL_HTTP.begin_request(url);
+      UTL_HTTP.set_header(req
+                         ,'User-Agent'
+                         ,'Mozilla/4.0');
+      resp := UTL_HTTP.get_response(req);
 
-   LOOP
-      UTL_HTTP.read_line(resp
-                        ,VALUE
-                        ,TRUE);
-      DBMS_OUTPUT.put_line(VALUE);
-   END LOOP;
+      LOOP
+         UTL_HTTP.read_line(resp
+                           ,VALUE
+                           ,TRUE);
+      END LOOP;
 
-   UTL_HTTP.end_response(resp);
-EXCEPTION
-   WHEN UTL_HTTP.end_of_body
-   THEN
       UTL_HTTP.end_response(resp);
+   EXCEPTION
+      WHEN UTL_HTTP.end_of_body
+      THEN
+         UTL_HTTP.end_response(resp);
+      WHEN OTHERS
+      THEN
+         UTL_HTTP.end_response(resp); -- 結束http請求
+         RAISE v_error;
+   END;
+
+
+   p_err_msg := NULL;
+   p_result := 'S';
+EXCEPTION
+   WHEN v_error
+   THEN
+      p_result := 'E';
+      p_err_msg := p_err_msg
+                   || CHR(10)
+                   || '此次執行的程式:'
+                   || CHR(10)
+                   || DBMS_UTILITY.format_error_stack
+                   || DBMS_UTILITY.format_error_backtrace
+                   || DBMS_UTILITY.format_call_stack;
    WHEN OTHERS
    THEN
-      DBMS_OUTPUT.put_line(UTL_HTTP.get_detailed_sqlerrm);
-END send_url;
+      p_result := 'E';
+      p_err_msg := p_err_msg
+                   || CHR(10)
+                   || '此次執行的程式:'
+                   || CHR(10)
+                   || DBMS_UTILITY.format_error_stack
+                   || DBMS_UTILITY.format_error_backtrace
+                   || DBMS_UTILITY.format_call_stack;
+END;
