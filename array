@@ -19,31 +19,42 @@ BEGIN
 END;
 
 DECLARE
-    TYPE t_a IS TABLE OF VARCHAR2 (1)
-        INDEX BY VARCHAR2 (40);
+   TYPE t_a IS TABLE OF VARCHAR2(1)
+      INDEX BY VARCHAR2(40);
 
-    TYPE t_b IS TABLE OF t_a
-        INDEX BY VARCHAR2 (40);
+   TYPE t_b IS TABLE OF t_a
+      INDEX BY VARCHAR2(40);
 
 
-    TYPE t_c IS TABLE OF t_b
-        INDEX BY VARCHAR2 (40);
-        
-    TYPE arr_chr_t IS TABLE OF VARCHAR2 (40)
-        INDEX BY BINARY_INTEGER;
+   TYPE t_c IS TABLE OF t_b
+      INDEX BY VARCHAR2(40);
 
-    a   t_a;
-    b   t_b;
-    c   t_c;
+   TYPE arr_chr_t IS TABLE OF VARCHAR2(40)
+      INDEX BY BINARY_INTEGER;
+
+   a t_a;
+   b t_b;
+   c t_c;
+   d arr_chr_t;
 BEGIN
-    a ('it') := 'y';
-    b ('hh') := a;
-    a.DELETE;
-    a ('is') := 'y';
-    b ('hh') := a;--('it') 被('is')換掉
+   a('it') := 'y';
+   b('hh') := a;
+   a.delete;
+   a('is') := 'y';
+   b('hh') := a; --('it') 被('is')換掉
 
-    IF b ('hh').EXISTS ('is')
-    THEN
-        DBMS_OUTPUT.PUT_LINE ('v_t = ' || b ('hh') ('is'));
-    END IF;
+   IF b('hh').EXISTS('is')
+   THEN
+      DBMS_OUTPUT.put_line('v_t = '
+                           || b('hh')('is'));
+   END IF;
+
+   d(1) := 'a';
+   d(2) := 'b';
+
+   FOR r IN d.FIRST .. d.LAST
+   LOOP
+      DBMS_OUTPUT.put_line('d(r) = '
+                           || d(r));
+   END LOOP;
 END;
