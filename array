@@ -29,7 +29,7 @@ DECLARE
    TYPE t_c IS TABLE OF t_b
       INDEX BY VARCHAR2(40);
 
-   TYPE arr_chr_t IS TABLE OF VARCHAR2(40)
+   TYPE arr_chr_t IS TABLE OF t_a --VARCHAR2(40)
       INDEX BY BINARY_INTEGER;
 
    a t_a;
@@ -49,12 +49,17 @@ BEGIN
                            || b('hh')('is'));
    END IF;
 
-   d(1) := 'a';
-   d(2) := 'b';
+   d(1) := a;
+   a.delete;
+   a('NN') := 'N';
+   d(2) := a;
 
    FOR r IN d.FIRST .. d.LAST
    LOOP
-      DBMS_OUTPUT.put_line('d(r) = '
-                           || d(r));
+      IF d(r).EXISTS('NN')
+      THEN
+         DBMS_OUTPUT.put_line('d(r) = '
+                              || d(r)('NN'));
+      END IF;
    END LOOP;
 END;
