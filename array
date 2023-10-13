@@ -44,3 +44,23 @@ BEGIN
       END IF;
    END LOOP;
 END;
+DECLARE
+   TYPE l_t IS TABLE OF apps.fnd_user%ROWTYPE
+      INDEX BY BINARY_INTEGER;
+
+   l_a l_t;
+BEGIN
+   SELECT *
+     BULK COLLECT INTO l_a
+     FROM apps.fnd_user;
+
+   FOR r_t IN 1 .. l_a.COUNT
+   LOOP
+      DBMS_OUTPUT.put_line('l_a(r_t).USER_ID = '
+                           || l_a(r_t).user_id);
+
+      UPDATE apps.fnd_user
+         SET user_name = l_a(r_t).user_name
+       WHERE user_id = l_a(r_t).user_id;
+   END LOOP;
+END;
