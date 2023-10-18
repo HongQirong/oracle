@@ -1,0 +1,9 @@
+SELECT NVL(SUM(a), 0)
+  FROM (SELECT '1' a FROM DUAL
+        UNION ALL
+        SELECT '2' a FROM DUAL
+        UNION ALL
+        SELECT '3' a FROM DUAL
+        UNION ALL
+        SELECT NULL a FROM DUAL)
+-- WHERE a > 3
