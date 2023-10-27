@@ -1,3 +1,11 @@
 SELECT *
   FROM nls_session_parameters
  WHERE parameter = 'NLS_DATE_FORMAT';
+
+SELECT TO_CHAR(SYSDATE
+              ,'MON-YY'
+              ,'nls_date_language = ''American''')
+  FROM DUAL;
+
+  -- TRADITIONAL CHINESE
+  ALTER SESSION SET nls_date_language = 'American';
